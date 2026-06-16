@@ -30,15 +30,19 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
 
+  enable_irsa = true
+
   cluster_name    = var.cluster_name
   cluster_version = "1.30"
 
   cluster_addons = {
     aws-ebs-csi-driver = {
-      most_recent = true
+      most_recent              = true
+      service_account_role_arn = aws_iam_role.ebs_csi.arn
 
     }
   }
+
 
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
