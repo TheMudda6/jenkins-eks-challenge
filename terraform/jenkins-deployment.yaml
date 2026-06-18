@@ -1,8 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
   name: jenkins
   namespace: jenkins
+
 spec:
   replicas: 1
 
@@ -15,22 +17,22 @@ spec:
       labels:
         app: jenkins
 
-  spec:
-    securityContext:
-      fsGroup: 1000
+    spec:
+      securityContext:
+        fsGroup: 1000
 
-    containers:
+      containers:
       - name: jenkins
         image: jenkins/jenkins:lts
 
         ports:
-          - containerPort: 8080
+        - containerPort: 8080
 
         volumeMounts:
-          - name: jenkins-storage
-            mountPath: /var/jenkins_home
+        - name: jenkins-storage
+          mountPath: /var/jenkins_home
 
-    volumes:
+      volumes:
       - name: jenkins-storage
         persistentVolumeClaim:
           claimName: jenkins-pvc
