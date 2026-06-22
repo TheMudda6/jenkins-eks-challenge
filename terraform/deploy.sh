@@ -100,6 +100,36 @@ echo ""
 echo "Service status verified"
 echo ""
 
+echo ""
+echo "Creating Ingress..."
+echo ""
+
+kubectl apply -f jenkins-ingress.yaml
+
+echo ""
+echo "Waiting for ALB hostname..."
+echo ""
+
+kubectl wait \
+  --for=jsonpath='{.status.loadBalancer.ingress[0].hostname}' \
+  ingress/jenkins-ingress \
+  -n jenkins \
+  --timeout=300s
+
+echo ""
+echo "Ingress created"
+echo ""
+
+kubectl get ingress -n jenkins
+
+echo ""
+echo "Ingress status:"
+kubectl get ingress -n jenkins
+
+echo ""
+echo "Service status:"
+kubectl get svc -n jenkins
+
 echo "====================================="
 echo "Jenkins Deployment Complete"
 echo "====================================="

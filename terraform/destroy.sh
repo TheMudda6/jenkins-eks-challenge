@@ -2,6 +2,8 @@
 
 set -e
 
+export AWS_PAGER=""
+
 echo ""
 echo "WARNING: This will destroy the entire Jenkins EKS environment."
 echo ""
@@ -20,6 +22,18 @@ echo "Starting environment cleanup..."
 echo ""
 echo "Checking cluster connection..."
 kubectl get nodes
+
+echo ""
+echo "Deleting Jenkins ingress..."
+echo ""
+
+kubectl delete -f jenkins-ingress.yaml --ignore-not-found=true
+
+echo ""
+echo "Waiting for ALB cleanup..."
+echo ""
+
+sleep 120
 
 echo ""
 echo "Deleting Jenkins service..."
