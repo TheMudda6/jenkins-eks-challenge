@@ -48,24 +48,6 @@ echo ""
 echo "PVC created"
 echo ""
 
-kubectl wait \
-  --for=condition=ready pod \
-  -l app=jenkins \
-  -n jenkins \
-  --timeout=300s
-
-sleep 10
-
-kubectl wait \
-  --for=jsonpath='{.status.phase}'=Bound \
-  pvc/jenkins-pvc \
-  -n jenkins \
-  --timeout=120s
-
-echo ""
-echo "PVC successfully bound"
-echo ""
-
 kubectl apply -f jenkins-deployment.yaml
 
 echo ""
@@ -86,6 +68,18 @@ kubectl wait \
 
 echo ""
 echo "Jenkins pod is ready"
+echo ""
+
+sleep 10
+
+kubectl wait \
+  --for=jsonpath='{.status.phase}'=Bound \
+  pvc/jenkins-pvc \
+  -n jenkins \
+  --timeout=120s
+
+echo ""
+echo "PVC successfully bound"
 echo ""
 
 kubectl get pods -n jenkins
