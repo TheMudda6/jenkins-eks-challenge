@@ -4,6 +4,9 @@ set -e
 
 export AWS_PAGER=""
 
+CLUSTER_NAME="jenkins-eks"
+AWS_REGION="eu-west-2"
+
 echo ""
 echo "WARNING: This will destroy the entire Jenkins EKS environment."
 echo ""
@@ -64,7 +67,7 @@ kubectl get pods -A
 
 echo ""
 echo "Checking load balancers..."
-aws elbv2 describe-load-balancers --region eu-west-2
+aws elbv2 describe-load-balancers --region $AWS_REGION
 
 echo ""
 echo "Running terraform destroy..."
@@ -84,7 +87,38 @@ echo ""
 echo "Checking for remaining VPCs..."
 aws ec2 describe-vpcs \
   --filters Name=tag:Name,Values=jenkins-vpc \
-  --region eu-west-2
+  --region $AWS_REGION
+
+echo ""
+echo "Checking for remaining CloudWatch log groups..."
+
+aws logs describe-log-groups \
+  --log-group-name-prefix /aws/eks/jenkins-eks \
+  --region $AWS_REGION
+
+  
+echo ""
+echo "Checking for remaining EBS volumes..."
+
+aws ec2 describe-volumes \
+  --region $AWS_REGION \
+  --filters Name=tag:KubernetesCluster,Values=jenkins-eks
+
+echo ""
+echo "Deleting orphaned CloudWatch log group if present..."
+
+aws logs delete-log-group \
+  --log-group-name /aws/eks/${CLUSTER_NAME}/cluster \
+  --region $AWS_REGION 2>/dev/null || true
+
+echo ""
+echo "Verifying CloudWatch cleanup..."
+
+aws logs describe-log-groups \
+  --log-group-name-prefix /aws/eks/jenkins-eks \
+  --region $AWS_REGION
 
 echo ""
 echo "Destroy completed."
+
+
