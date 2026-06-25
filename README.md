@@ -9,13 +9,13 @@ A production-inspired Jenkins deployment on Amazon EKS using Terraform, Kubernet
 - [Architecture](#architecture)
 - [Technologies Used](#technologies-used)
 - [Infrastructure Components](#infrastructure-components)
+- [Storage Lifecycle](#storage-lifecycle-jenkins-data-persistence)
 - [Deployment Process](#deployment-process)
 - [Environment Cleanup](#environment-cleanup)
 - [Challenges & Troubleshooting](#challenges--troubleshooting)
 - [Lessons Learned](#lessons-learned)
 - [Future Improvements](#future-improvements)
 - [Repository Structure](#repository-structure)
-- [Screenshots](#screenshots)
 - [Deployment](#deployment)
 - [Environment Destruction](#environment-destruction)
 - [Author](#author)
@@ -40,6 +40,18 @@ The following diagram illustrates the complete infrastructure and request flow f
 ![Architecture Overview](screenshots/architecture-overview.png)
 
 The deployment follows a layered architecture that separates infrastructure provisioning, networking, application routing, and persistent storage. Each layer has a dedicated responsibility, improving security, maintainability, and scalability while reducing manual configuration.
+
+### Cloudflare DNS
+
+The project uses Cloudflare to manage DNS records for the custom domain. The Jenkins subdomain points to the AWS Application Load Balancer using a CNAME record, allowing the application to be accessed through a memorable HTTPS endpoint.
+
+![Cloudflare DNS](screenshots/cloudflare-dns.png)
+
+### Jenkins Dashboard & HTTPS
+
+Once deployed, Jenkins is accessible through the custom domain over HTTPS using an AWS Certificate Manager certificate.
+
+![Jenkins Dashboard](screenshots/jenkins-dashboard-https.png)
 
 ---
 
@@ -137,7 +149,7 @@ The deployment and destruction lifecycle is illustrated below.
 
 ![Deployment and Destruction Flow](screenshots/deployment-destruction.png)
 
-The project uses two automation scripts:
+The project uses two custom automation scripts:
 
 - **deploy.sh** provisions the Kubernetes application after Terraform creates the AWS infrastructure.
 - **destroy.sh** removes Kubernetes resources before destroying the AWS infrastructure and verifies that no orphaned resources remain.
@@ -146,7 +158,7 @@ This workflow allows the environment to be deployed and destroyed consistently u
 
 ### Stage 1 - Infrastructure Provisioning
 
-Terraform provisions the AWS infrastructure required to support the Kubernetes environment, including:
+Terraform provisions and manages the AWS infrastructure required to support the Kubernetes environment, including:
 
 - Virtual Private Cloud (VPC)
 - Amazon EKS Cluster
@@ -188,6 +200,28 @@ The deployment script performs the following tasks:
 
 This automation removes the need to manually execute Kubernetes commands while validating that each deployment stage completes successfully before continuing.
 
+### Deployment Validation
+
+#### Terraform Deployment
+
+![Terraform Deployment](screenshots/deploy-success.png)
+
+#### Kubernetes Worker Node
+
+![Worker Node](screenshots/kubectl-get-nodes.png)
+
+#### Running Jenkins Pod
+
+![Running Pod](screenshots/kubectl-get-pods.png)
+
+#### Persistent Volume Claim
+
+![Persistent Volume Claim](screenshots/kubectl-get-pvc.png)
+
+#### Kubernetes Ingress
+
+![Ingress](screenshots/kubectl-get-ingress.png)
+
 ---
 
 ## Environment Cleanup
@@ -212,6 +246,10 @@ The cleanup process performs the following actions:
 - Confirms infrastructure cleanup has completed
 
 During development, additional validation steps were added after discovering orphaned Amazon EBS volumes and CloudWatch Log Groups following infrastructure destruction. These improvements increased confidence that the environment could be recreated from scratch without incurring unnecessary AWS costs.
+
+### Cleanup Validation
+
+![Environment Destroyed](screenshots/destroy-success.png)
 
 ---
 
@@ -269,17 +307,17 @@ Maintaining documentation throughout the project reinforced my understanding of 
 
 Every major component of the project was tested throughout its lifecycle. Persistent storage, HTTPS connectivity, automated deployment, infrastructure destruction, and resource cleanup were all validated to ensure the environment behaved as expected under real deployment conditions.
 
+Testing both successful deployments and complete environment destruction gave me a much deeper understanding of infrastructure dependencies and reinforced the importance of validating every stage of the infrastructure lifecycle.
+
 ---
 
 ## Future Improvements
-
-
 
 Although the project successfully achieved its objectives, there are several enhancements that could be implemented in future iterations.
 
 Future improvements include:
 
-- Manage Cloudflare DNS records using the Terraform Cloudflare Provider.
+- Manage Cloudflare DNS records using the Terraform Cloudflare Provider to automatically update the Jenkins CNAME whenever a new Application Load Balancer is created.
 - Automatically request and validate AWS Certificate Manager certificates through Terraform.
 - Store Kubernetes manifests as Terraform resources for a fully Infrastructure as Code deployment.
 - Implement GitHub Actions for Continuous Integration and Continuous Deployment (CI/CD).
@@ -294,39 +332,52 @@ Future improvements include:
 
 ## Repository Structure
 
-```
+```text
 jenkins-eks-challenge/
+│
+├── bootstrap/
+│   ├── main.tf
+│   ├── providers.tf
+│   ├── versions.tf
+│   ├── terraform.tfstate
+│   └── terraform.tfstate.backup
+│
+├── kubernetes/
+│   └── jenkins/
+│
+├── screenshots/
+│   ├── architecture-overview.png
+│   ├── deployment-destruction.png
+│   ├── storage-lifecycle.png
+│   ├── cloudflare-dns.png
+│   ├── deploy-success.png
+│   ├── destroy-success.png
+│   ├── jenkins-dashboard-https.png
+│   ├── kubectl-get-ingress.png
+│   ├── kubectl-get-nodes.png
+│   ├── kubectl-get-pods.png
+│   └── kubectl-get-pvc.png
 │
 ├── terraform/
 │   ├── main.tf
 │   ├── providers.tf
 │   ├── variables.tf
 │   ├── outputs.tf
+│   ├── iam.tf
+│   ├── helm.tf
 │   ├── deploy.sh
 │   ├── destroy.sh
 │   ├── jenkins-deployment.yaml
 │   ├── jenkins-service.yaml
 │   ├── jenkins-pvc.yaml
-│   └── jenkins-ingress.yaml
+│   ├── jenkins-ingress.yaml
+│   ├── iam_policy.json
+│   └── test-pod.yaml
 │
-├── screenshots/
-│
-└── README.md
+├── iam_policy.json
+├── README.md
+└── .gitignore
 ```
-
----
-
-## Screenshots
-
-The following screenshots demonstrate the completed deployment:
-
-- Terraform infrastructure deployment
-- Successful Kubernetes deployment
-- Jenkins web interface
-- HTTPS certificate validation
-- Cloudflare DNS configuration
-- Persistent Volume Claim successfully bound
-- Successful environment destruction
 
 ---
 
