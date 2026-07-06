@@ -1,11 +1,27 @@
+# ----------------------------
 # Terraform
+# ----------------------------
+
+# Terraform working directory
 **/.terraform/*
+
+# Terraform state
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
 
+# Terraform plan files
+*.tfplan
+tfplan
+destroy.tfplan
+
+# ----------------------------
 # VS Code
+# ----------------------------
+
 .vscode/
 
-# Mac/Linux
+# ----------------------------
+# macOS / Linux
+# ----------------------------
+
 .DS_Store
