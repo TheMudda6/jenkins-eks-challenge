@@ -20,13 +20,13 @@ resource "helm_release" "aws_load_balancer_controller" {
   }
 
   set {
-  name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-  value = aws_iam_role.aws_load_balancer_controller.arn
-}
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.aws_load_balancer_controller.arn
+  }
 
- depends_on = [
-  module.eks,
-  aws_iam_role.aws_load_balancer_controller,
-  aws_iam_role_policy_attachment.aws_load_balancer_controller
-]
+  depends_on = [
+    module.eks,
+    aws_iam_role.aws_load_balancer_controller,
+    aws_iam_role_policy_attachment.aws_load_balancer_controller
+  ]
 }
