@@ -1,65 +1,71 @@
+# VPC Module
+
+# -----------------------------------------------------------------------------
+# VPC Module
+# Purpose:
+# Creates the networking foundation for the platform, including the VPC,
+# subnets, Internet Gateway, NAT Gateway and route tables.
+# -----------------------------------------------------------------------------
+
 module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
+  source = "./modules/vpc"
 
-  name = "jenkins-vpc"
+  # Inputs from variables.tf go here
 
-  cidr = "10.0.0.0/16"
+  vpc_name           = var.vpc_name
+  vpc_cidr           = var.vpc_cidr
+  availability_zones = var.availability_zones
+  private_subnets    = var.private_subnets
+  public_subnets     = var.public_subnets
 
-  azs = [
-    "eu-west-2a",
-    "eu-west-2b"
-  ]
-
-  private_subnets = [
-    "10.0.1.0/24",
-    "10.0.2.0/24"
-  ]
-
-  public_subnets = [
-    "10.0.101.0/24",
-    "10.0.102.0/24"
-  ]
-
-  enable_nat_gateway = true
-
-  single_nat_gateway = true
+  environment  = var.environment
+  project_name = var.project_name
+  owner        = var.owner
 }
 
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
+# IAM Module
+#
+# Purpose:
+# Creates the IAM roles and policies required for the EKS cluster and managed node group.
 
-  enable_irsa = true
+module "iam" {
+  source = "./modules/iam"
+
+  # Inputs from variables.tf go here
+
+  eks_cluster_role_name = var.eks_cluster_role_name
+  node_group_role_name  = var.node_group_role_name
+}
+
+# -----------------------------------------------------------------------------
+# EKS Module
+#
+# Purpose:
+# Creates the Kubernetes control plane and managed node group.
+#
+# Consumes:
+
+# - Private subnet IDs from the VPC module
+# - Cluster role ARN from the IAM module
+# - Node group role ARN from the IAM module
+# -----------------------------------------------------------------------------
+
+module "eks" {
+  source = "./modules/eks"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.30"
-
-  cluster_addons = {
-    aws-ebs-csi-driver = {
-      most_recent              = true
-      service_account_role_arn = aws_iam_role.ebs_csi.arn
-
-    }
-  }
-
-
-  cluster_endpoint_public_access  = true
-  cluster_endpoint_private_access = true
-
-  enable_cluster_creator_admin_permissions = true
-
-  vpc_id = module.vpc.vpc_id
+  cluster_version = var.cluster_version
 
   subnet_ids = module.vpc.private_subnets
 
-  eks_managed_node_groups = {
-    default = {
-      instance_types = ["t3.small"]
+  cluster_role_arn = module.iam.eks_cluster_role_arn
+  node_role_arn    = module.iam.node_group_role_arn
 
-      min_size     = 1
-      max_size     = 2
-      desired_size = 1
-    }
-  }
+  min_size     = var.min_size
+  desired_size = var.desired_size
+  max_size     = var.max_size
+
+  instance_type = var.instance_type
+
+  tags = var.tags
 }

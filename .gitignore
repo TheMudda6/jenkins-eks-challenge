@@ -1,18 +1,3 @@
-# ----------------------------
-# Terraform
-# ----------------------------
-
-# Terraform working directory
-**/.terraform/*
-
-# Terraform state
-*.tfstate
-*.tfstate.*
-
-# Terraform plan files
-*.tfplan
-tfplan
-destroy.tfplan
 
 # ----------------------------
 # VS Code
@@ -25,3 +10,22 @@ destroy.tfplan
 # ----------------------------
 
 .DS_Store
+
+# -----------------------------------------------------------------------------
+# Terraform
+#
+# Purpose:
+# Ignore generated Terraform files and deployment-specific configuration.
+# -----------------------------------------------------------------------------
+
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform/terraform.tfvars.example
+*.auto.tfvars
+*.tfplan
+tfplan
+destroy.tfplan
+crash.log
+.terraform.tfstate.lock.info
