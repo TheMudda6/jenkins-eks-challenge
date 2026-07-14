@@ -41,7 +41,7 @@ output "cluster_oidc_issuer_url" {
 
 output "oidc_provider" {
   description = "OIDC provider identifier without the https:// prefix."
-  value       = replace(
+  value = replace(
     aws_eks_cluster.main.identity[0].oidc[0].issuer,
     "https://",
     ""

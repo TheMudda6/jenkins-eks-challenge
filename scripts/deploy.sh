@@ -1,136 +1,204 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+cd "$PROJECT_ROOT/terraform"
+
 set -euo pipefail
 
 trap 'echo ""; echo "ERROR: Deployment failed on line $LINENO"; exit 1' ERR
 
-echo ""
-echo "====================================="
-echo "Starting Jenkins EKS Deployment"
-echo "====================================="
-echo ""
+# --------------------------------------------------------------------
+# Deployment Configuration
+#
+# Purpose:
+# Centralise values that may change between environments.
+# --------------------------------------------------------------------
 
-terraform apply -auto-approve
+AWS_REGION="eu-west-2"
+CLUSTER_NAME="jenkins-eks"
+NAMESPACE="jenkins"
 
-echo ""
-echo "Terraform deployment complete"
-echo ""
+# --------------------------------------------------------------------
+# Helper Functions
+#
+# Purpose:
+# Reusable functions used throughout the deployment.
+# --------------------------------------------------------------------
+
+print_banner() {
+    echo
+    echo "====================================="
+    echo "$1"
+    echo "====================================="
+    echo
+}
+
+# --------------------------------------------------------------------
+# Prerequisite Checks
+#
+# Purpose:
+# Verify all required tools are installed before deployment begins.
+# --------------------------------------------------------------------
+
+command -v terraform >/dev/null || { echo "ERROR: Terraform is not installed."; exit 1; }
+command -v aws >/dev/null || { echo "ERROR: AWS CLI is not installed."; exit 1; }
+command -v kubectl >/dev/null || { echo "ERROR: kubectl is not installed."; exit 1; }
+command -v helm >/dev/null || { echo "ERROR: Helm is not installed."; exit 1; }
+
+echo "✓ All prerequisites found."
+
+# --------------------------------------------------------------------
+# AWS Authentication Check
+#
+# Purpose:
+# Verify AWS credentials are valid before provisioning infrastructure.
+# --------------------------------------------------------------------
+
+echo "Verifying AWS credentials..."
+
+aws sts get-caller-identity
+
+echo "✓ AWS credentials verified."
+
+print_banner "Starting Jenkins EKS Deployment"
+
+# --------------------------------------------------------------------
+# Terraform Validation
+#
+# Purpose:
+# Ensure Terraform configuration is correctly formatted and valid
+# before planning or applying infrastructure changes.
+# --------------------------------------------------------------------
+
+print_banner "Terraform Validation"
+
+echo "Formatting Terraform configuration..."
+
+terraform fmt -recursive
+
+echo "✓ Terraform formatting complete."
+
+echo "Validating Terraform configuration..."
+
+terraform validate
+
+echo "✓ Terraform validation complete. "
+
+# --------------------------------------------------------------------
+# Terraform Plan & Apply
+#
+# Purpose:
+# Create a deployment plan, allow it to be reviewed,
+# then apply the exact approved plan.
+# --------------------------------------------------------------------
+
+print_banner "Terraform Deployment"
+
+echo "Creating Terraform execution plan..."
+
+terraform plan -out=tfplan
+
+echo "✓ Terraform plan created."
+
+echo "Applying Terraform plan..."
+
+terraform apply tfplan
+
+echo "✓ Terraform apply complete."
+
+print_banner "Configuring Kubernetes"
 
 aws eks update-kubeconfig \
-  --region eu-west-2 \
-  --name jenkins-eks
+  --region "$AWS_REGION" \
+  --name "$CLUSTER_NAME"
 
-echo ""
-echo "Kubeconfig updated"
-echo ""
+echo "✓ Kubeconfig updated."
 
 kubectl get nodes
 
-echo ""
-echo "Cluster connectivity verified"
-echo ""
+echo "✓ Cluster connectivity verified."
 
 kubectl get storageclass
 
-echo ""
-echo "StorageClass verified"
-echo ""
+echo "✓ StorageClass verified."
 
-kubectl create namespace jenkins --dry-run=client -o yaml | kubectl apply -f -
+print_banner "Deploying Jenkins"
 
-echo ""
-echo "Namespace ready"
-echo ""
+kubectl create namespace "$NAMESPACE" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "✓ Namespace created."
 
 kubectl apply -f jenkins-pvc.yaml
 
-echo ""
-echo "PVC created"
-echo ""
+echo "✓ PVC created"
 
 kubectl apply -f jenkins-deployment.yaml
 
-echo ""
-echo "Deployment created"
-echo ""
+echo "✓ Deployment created"
 
 kubectl apply -f jenkins-service.yaml
 
+echo "✓ Service created"
+
 echo ""
-echo "Service created"
+echo "Waiting for the Jenkins pod to become Ready..."
+echo "This can take several minutes while the image is downloaded and started."
+echo "Please do not close the terminal or press Ctrl+C, the deployment will continue automatically once the pod is Ready."
 echo ""
 
 kubectl wait \
   --for=condition=ready pod \
   -l app=jenkins \
-  -n jenkins \
+  -n "$NAMESPACE" \
   --timeout=300s
 
-echo ""
-echo "Jenkins pod is ready"
-echo ""
+echo "✓ Jenkins pod is ready"
 
 sleep 10
 
 kubectl wait \
   --for=jsonpath='{.status.phase}'=Bound \
   pvc/jenkins-pvc \
-  -n jenkins \
+  -n "$NAMESPACE" \
   --timeout=120s
 
-echo ""
-echo "PVC successfully bound"
-echo ""
+echo "✓ PVC is successfully bound"
 
-kubectl get pods -n jenkins
+kubectl get pods -n "$NAMESPACE"
 
-echo ""
-echo "Pod status verified"
-echo ""
+echo "✓ Pod status verified"
 
-kubectl get pvc -n jenkins
+kubectl get pvc -n "$NAMESPACE"
 
-echo ""
-echo "PVC status verified"
-echo ""
+echo "✓ PVC status verified"
 
-kubectl get svc -n jenkins
+kubectl get svc -n "$NAMESPACE"
 
-echo ""
-echo "Service status verified"
-echo ""
+echo "✓ Service status verified"
 
-echo ""
-echo "Creating Ingress..."
-echo ""
+print_banner "Creating Ingress"
 
 kubectl apply -f jenkins-ingress.yaml
 
-echo ""
-echo "Waiting for ALB hostname..."
-echo ""
+echo "✓ Waiting for Ingress to be created and assigned a hostname..."
 
 kubectl wait \
   --for=jsonpath='{.status.loadBalancer.ingress[0].hostname}' \
   ingress/jenkins-ingress \
-  -n jenkins \
+  -n "$NAMESPACE" \
   --timeout=300s
 
-echo ""
-echo "Ingress created"
-echo ""
-
-kubectl get ingress -n jenkins
+echo "✓ Ingress created and hostname assigned"
 
 echo ""
 echo "Ingress status:"
-kubectl get ingress -n jenkins
+kubectl get ingress -n "$NAMESPACE"
 
 echo ""
 echo "Service status:"
-kubectl get svc -n jenkins
+kubectl get svc -n "$NAMESPACE"
 
-echo "====================================="
-echo "Jenkins Deployment Complete"
-echo "====================================="
-echo ""
+print_banner "Deployment Complete!"

@@ -10,6 +10,16 @@ resource "helm_release" "aws_load_balancer_controller" {
   }
 
   set {
+    name  = "vpcId"
+    value = module.vpc.vpc_id
+  }
+
+  set {
+    name  = "replicaCount"
+    value = "2"
+  }
+
+  set {
     name  = "serviceAccount.create"
     value = "true"
   }

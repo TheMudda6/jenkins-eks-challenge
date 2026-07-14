@@ -30,3 +30,17 @@ resource "aws_iam_role_policy_attachment" "node_group_role_ecr_readonly_policy_a
   role       = aws_iam_role.node_group_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
+
+# --------------------------------------------------------------------
+# Amazon EKS CNI Policy
+#
+# Purpose:
+# Allows worker nodes to manage pod networking by creating and managing
+# Elastic Network Interfaces (ENIs) and assigning IP addresses.
+# --------------------------------------------------------------------
+
+resource "aws_iam_role_policy_attachment" "node_cni" {
+  role       = aws_iam_role.node_group_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
