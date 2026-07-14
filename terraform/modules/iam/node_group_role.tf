@@ -17,14 +17,14 @@ resource "aws_iam_role" "node_group_role" {
   })
 }
 
-#Policy attachment for Node Group Role
+# Policy attachment for Node Group Role
 
 resource "aws_iam_role_policy_attachment" "node_group_role_policy_attachment" {
   role       = aws_iam_role.node_group_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 }
 
-#EC2 Container Registry (ECR) Read-Only Policy Attachment for Node Group Role
+# EC2 Container Registry (ECR) Read-Only Policy Attachment for Node Group Role
 
 resource "aws_iam_role_policy_attachment" "node_group_role_ecr_readonly_policy_attachment" {
   role       = aws_iam_role.node_group_role.name

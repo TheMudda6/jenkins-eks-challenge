@@ -1,3 +1,40 @@
+# -----------------------------------------------------------------------------
+# Terraform Variables Example
+#
+# Purpose:
+# Copy this file to terraform.tfvars and replace the example values with
+# values appropriate for your environment.
+#
+# Example:
+#
+# cp terraform.tfvars.example terraform.tfvars
+# -----------------------------------------------------------------------------
+
+# =============================================================================
+# AWS Configuration
+# =============================================================================
+
+aws_region = "eu-west-2"
+
+# =============================================================================
+# Project Configuration
+# =============================================================================
+
+environment  = "development"
+project_name = "jenkins-eks-challenge"
+owner         = "YOUR_NAME"
+
+tags = {
+  ManagedBy = "Terraform"
+}
+
+# =============================================================================
+# VPC Configuration
+# =============================================================================
+
+vpc_name = "jenkins-vpc"
+vpc_cidr = "10.0.0.0/16"
+
 availability_zones = [
   "eu-west-2a",
   "eu-west-2b"
@@ -13,12 +50,25 @@ public_subnets = [
   "10.0.102.0/24"
 ]
 
-vpc_name = "jenkins-vpc"
-vpc_cidr = "10.0.0.0/16"
+# =============================================================================
+# IAM Configuration
+# =============================================================================
 
-environment = "dev"
-project_name = "jenkins-eks-challenge"
-owner = "PLACEHOLDER"
+eks_cluster_role_name                    = "jenkins-eks-cluster-role"
+node_group_role_name                     = "jenkins-node-group-role"
+ebs_csi_driver_role_name                 = "AmazonEKS_EBS_CSI_DriverRole"
+aws_load_balancer_controller_role_name   = "AmazonEKSLoadBalancerControllerRole"
+aws_load_balancer_controller_policy_name = "AWSLoadBalancerControllerIAMPolicy"
 
-eks_cluster_role_name = "jenkins-eks-cluster-role"
-node_group_role_name  = "jenkins-node-group-role"
+# =============================================================================
+# EKS Configuration
+# =============================================================================
+
+cluster_name    = "jenkins-eks"
+cluster_version = "1.30"
+
+instance_type = "t3.small"
+
+min_size     = 1
+desired_size = 1
+max_size     = 2

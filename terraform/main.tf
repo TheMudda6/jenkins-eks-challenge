@@ -1,7 +1,6 @@
-# VPC Module
-
 # -----------------------------------------------------------------------------
 # VPC Module
+#
 # Purpose:
 # Creates the networking foundation for the platform, including the VPC,
 # subnets, Internet Gateway, NAT Gateway and route tables.
@@ -10,7 +9,9 @@
 module "vpc" {
   source = "./modules/vpc"
 
-  # Inputs from variables.tf go here
+  # ---------------------------------------------------------------------------
+  # VPC Configuration
+  # ---------------------------------------------------------------------------
 
   vpc_name           = var.vpc_name
   vpc_cidr           = var.vpc_cidr
@@ -18,23 +19,51 @@ module "vpc" {
   private_subnets    = var.private_subnets
   public_subnets     = var.public_subnets
 
+  # ---------------------------------------------------------------------------
+  # Project Configuration
+  # ---------------------------------------------------------------------------
+
   environment  = var.environment
   project_name = var.project_name
   owner        = var.owner
 }
 
+# -----------------------------------------------------------------------------
 # IAM Module
 #
 # Purpose:
-# Creates the IAM roles and policies required for the EKS cluster and managed node group.
+# Creates the IAM Roles and Policies required by the EKS platform,
+# including the control plane, worker nodes and supporting Kubernetes
+# controllers.
+# -----------------------------------------------------------------------------
 
 module "iam" {
   source = "./modules/iam"
 
-  # Inputs from variables.tf go here
+  # ---------------------------------------------------------------------------
+  # IAM Role & Policy Names
+  #
+  # Purpose:
+  # Defines the names of the IAM Roles and Policies created for the
+  # EKS platform.
+  # ---------------------------------------------------------------------------
 
-  eks_cluster_role_name = var.eks_cluster_role_name
-  node_group_role_name  = var.node_group_role_name
+  eks_cluster_role_name                    = var.eks_cluster_role_name
+  node_group_role_name                     = var.node_group_role_name
+  ebs_csi_driver_role_name                 = var.ebs_csi_driver_role_name
+  aws_load_balancer_controller_role_name   = var.aws_load_balancer_controller_role_name
+  aws_load_balancer_controller_policy_name = var.aws_load_balancer_controller_policy_name
+
+  # ---------------------------------------------------------------------------
+  # EKS OIDC Provider Information
+  #
+  # Purpose:
+  # Passes the EKS OpenID Connect (OIDC) provider details into the IAM
+  # module so IAM Roles for Service Accounts (IRSA) can be configured.
+  # ---------------------------------------------------------------------------
+
+  oidc_provider_arn       = module.eks.oidc_provider_arn
+  cluster_oidc_issuer_url = module.eks.cluster_oidc_issuer_url
 }
 
 # -----------------------------------------------------------------------------
@@ -44,7 +73,6 @@ module "iam" {
 # Creates the Kubernetes control plane and managed node group.
 #
 # Consumes:
-
 # - Private subnet IDs from the VPC module
 # - Cluster role ARN from the IAM module
 # - Node group role ARN from the IAM module
