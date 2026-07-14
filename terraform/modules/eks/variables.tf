@@ -53,3 +53,8 @@ variable "instance_type" {
   type        = string
   default     = "t3.small"
 }
+
+variable "ebs_csi_driver_role_arn" {
+  description = "IAM Role ARN used by the Amazon EBS CSI Driver add-on."
+  type        = string
+}

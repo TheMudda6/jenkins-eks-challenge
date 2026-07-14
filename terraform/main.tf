@@ -96,4 +96,8 @@ module "eks" {
   instance_type = var.instance_type
 
   tags = var.tags
+
+  # Existing configuration...
+
+  ebs_csi_driver_role_arn = module.iam.ebs_csi_driver_role_arn
 }

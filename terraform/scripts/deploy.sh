@@ -1,9 +1,15 @@
 #!/bin/bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+TERRAFORM_DIR="$(dirname "$SCRIPT_DIR")"
 
-cd "$PROJECT_ROOT/terraform"
+cd "$TERRAFORM_DIR"
+
+echo "Working directory: $(pwd)"
+
+echo "Working directory: $(pwd)"
+
+ls
 
 set -euo pipefail
 
@@ -131,15 +137,15 @@ kubectl create namespace "$NAMESPACE" \
 
 echo "✓ Namespace created."
 
-kubectl apply -f jenkins-pvc.yaml
+kubectl apply -f k8s/jenkins-pvc.yaml
 
 echo "✓ PVC created"
 
-kubectl apply -f jenkins-deployment.yaml
+kubectl apply -f k8s/jenkins-deployment.yaml
 
 echo "✓ Deployment created"
 
-kubectl apply -f jenkins-service.yaml
+kubectl apply -f k8s/jenkins-service.yaml
 
 echo "✓ Service created"
 
@@ -181,7 +187,7 @@ echo "✓ Service status verified"
 
 print_banner "Creating Ingress"
 
-kubectl apply -f jenkins-ingress.yaml
+kubectl apply -f k8s/jenkins-ingress.yaml
 
 echo "✓ Waiting for Ingress to be created and assigned a hostname..."
 
@@ -200,5 +206,13 @@ kubectl get ingress -n "$NAMESPACE"
 echo ""
 echo "Service status:"
 kubectl get svc -n "$NAMESPACE"
+
+echo ""
+echo "Cleaning temporary Terraform files..."
+
+rm -f tfplan
+
+echo "✓ Temporary Terraform files removed."
+echo ""
 
 print_banner "Deployment Complete!"

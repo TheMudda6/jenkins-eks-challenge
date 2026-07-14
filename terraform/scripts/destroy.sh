@@ -89,7 +89,7 @@ kubectl get nodes
 
 echo "Deleting Jenkins ingress..."
 
-kubectl delete -f jenkins-ingress.yaml --ignore-not-found=true
+kubectl delete -f k8s/jenkins-ingress.yaml --ignore-not-found=true
 
 echo "✓ Jenkins ingress deleted."
 
@@ -99,19 +99,19 @@ sleep 120
 
 echo "Deleting Jenkins service..."
 
-kubectl delete -f jenkins-service.yaml --ignore-not-found=true
+kubectl delete -f k8s/jenkins-service.yaml --ignore-not-found=true
 
 echo "✓ Jenkins service deleted."
 
 echo "Deleting Jenkins deployment..."
 
-kubectl delete -f jenkins-deployment.yaml --ignore-not-found=true
+kubectl delete -f k8s/jenkins-deployment.yaml --ignore-not-found=true
 
 echo "✓ Jenkins deployment deleted."
 
 echo "Deleting Jenkins PVC..."
 
-kubectl delete -f jenkins-pvc.yaml --ignore-not-found=true
+kubectl delete -f k8s/jenkins-pvc.yaml --ignore-not-found=true
 
 echo "✓ Jenkins PVC deleted."
 
@@ -208,5 +208,13 @@ aws logs delete-log-group \
   --region "$AWS_REGION" 2>/dev/null || true
 
 echo "✓ Verification complete."
+
+echo ""
+echo "Cleaning temporary Terraform files..."
+
+rm -f tfplan destroy.tfplan
+
+echo "✓ Temporary Terraform files removed."
+echo ""
 
 print_banner "Cleanup Complete!"
