@@ -33,7 +33,7 @@ variable "node_role_arn" {
 variable "desired_size" {
   description = "The desired number of worker nodes in the EKS node group."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "min_size" {

@@ -7,8 +7,6 @@ cd "$TERRAFORM_DIR"
 
 echo "Working directory: $(pwd)"
 
-echo "Working directory: $(pwd)"
-
 ls
 
 set -euo pipefail
@@ -110,7 +108,7 @@ echo "✓ Terraform plan created."
 
 echo "Applying Terraform plan..."
 
-terraform apply tfplan
+terraform apply -auto-approve tfplan
 
 echo "✓ Terraform apply complete."
 
@@ -120,15 +118,59 @@ aws eks update-kubeconfig \
   --region "$AWS_REGION" \
   --name "$CLUSTER_NAME"
 
-echo "✓ Kubeconfig updated."
-
 kubectl get nodes
 
 echo "✓ Cluster connectivity verified."
 
+echo ""
+echo "Verifying AWS Load Balancer Controller..."
+
+kubectl wait \
+  --for=condition=Available \
+  deployment/aws-load-balancer-controller \
+  -n kube-system \
+  --timeout=120s
+
+echo "✓ AWS Load Balancer Controller is ready."
+
+echo ""
+echo "Verifying Amazon EBS CSI Driver..."
+
+kubectl wait \
+  --for=condition=Available \
+  deployment/ebs-csi-controller \
+  -n kube-system \
+  --timeout=120s
+
+echo "✓ Amazon EBS CSI Driver is ready."
+
+# ------------------------------------------------------------
+# Storage Resources
+#
+# Purpose:
+# Configure Kubernetes StorageClasses used by workloads.
+# ------------------------------------------------------------
+
+print_banner "Storage Resources"
+
+echo "Creating gp3 StorageClass..."
+
+kubectl apply -f k8s/storage/gp3-storageclass.yaml
+
+echo "✓ gp3 StorageClass created."
+
+echo "Creating gp3-retain StorageClass..."
+
+kubectl apply -f k8s/storage/gp3-retain-storageclass.yaml
+
+echo "✓ gp3-retain StorageClass created."
+
+echo ""
+echo "Current StorageClasses:"
+
 kubectl get storageclass
 
-echo "✓ StorageClass verified."
+echo "✓ Storage resources verified."
 
 print_banner "Deploying Jenkins"
 

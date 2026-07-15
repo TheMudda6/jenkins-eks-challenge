@@ -1,0 +1,12 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+
+metadata:
+  name: jenkins-snapshot
+  namespace: jenkins
+
+spec:
+  volumeSnapshotClassName: ebs-csi-snapshot-class
+
+  source:
+    persistentVolumeClaimName: jenkins-pvc

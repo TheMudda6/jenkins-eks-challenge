@@ -16,7 +16,7 @@ resource "helm_release" "aws_load_balancer_controller" {
 
   set {
     name  = "replicaCount"
-    value = "2"
+    value = "1"
   }
 
   set {
