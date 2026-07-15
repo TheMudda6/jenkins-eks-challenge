@@ -131,6 +131,25 @@ echo ""
 echo "Remaining cluster resources:"
 kubectl get pods -A || true
 
+# ------------------------------------------------------------
+# Storage Cleanup
+#
+# Purpose:
+# Remove cluster storage resources before destroying the cluster.
+# ------------------------------------------------------------
+# GP3 StorageClass Cleanup
+# gp3-retain, gp3, VolumeSnapshotClass
+
+echo "Deleting gp3-retain StorageClass..."
+kubectl delete -f storage/gp3-retain-storageclass.yaml --ignore-not-found=true
+
+echo "✓ gp3-retain StorageClass deleted."
+
+echo "Deleting gp3 StorageClass..."
+kubectl delete -f storage/gp3-storageclass.yaml --ignore-not-found=true
+
+echo "✓ gp3 StorageClass deleted."
+
 # --------------------------------------------------------------------
 # Terraform Cleanup
 #
