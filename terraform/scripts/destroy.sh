@@ -131,6 +131,19 @@ echo ""
 echo "Remaining cluster resources:"
 kubectl get pods -A || true
 
+# --------------------------------------------------------------------
+# Snapshot Infrastructure Cleanup
+#
+# Purpose:
+# Remove all Kubernetes snapshot resources before destroying the cluster.
+# --------------------------------------------------------------------
+
+print_banner "Removing Snapshot Infrastructure"
+
+bash k8s/snapshot/uninstall.sh
+
+echo "✓ Snapshot infrastructure removed."
+
 # ------------------------------------------------------------
 # Storage Cleanup
 #
@@ -219,6 +232,31 @@ echo "Checking for remaining EBS volumes..."
 aws ec2 describe-volumes \
   --region "$AWS_REGION" \
   --filters Name=tag:KubernetesCluster,Values="$CLUSTER_NAME"
+
+echo ""
+echo "Checking for remaining VolumeSnapshotClasses..."
+
+kubectl get volumesnapshotclass 2>/dev/null || echo "✓ No VolumeSnapshotClasses found."
+
+echo ""
+echo "Checking for remaining VolumeSnapshots..."
+
+kubectl get volumesnapshot -A 2>/dev/null || echo "✓ No VolumeSnapshots found."
+
+echo ""
+echo "Checking for remaining VolumeSnapshotContents..."
+
+kubectl get volumesnapshotcontent 2>/dev/null || echo "✓ No VolumeSnapshotContents found."
+
+echo ""
+echo "Checking Snapshot Controller..."
+
+kubectl get deployment snapshot-controller -n kube-system 2>/dev/null || echo "✓ Snapshot Controller removed."
+
+echo ""
+echo "Checking Snapshot CRDs..."
+
+kubectl get crd | grep snapshot || echo "✓ No Snapshot CRDs found."
 
 echo "Removing orphaned CloudWatch log group if present..."
 

@@ -228,7 +228,7 @@ variable "min_size" {
 variable "desired_size" {
   description = "Desired number of worker nodes."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 # -----------------------------------------------------------------------------

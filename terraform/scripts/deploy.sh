@@ -144,6 +144,20 @@ kubectl wait \
 
 echo "✓ Amazon EBS CSI Driver is ready."
 
+# --------------------------------------------------------------------
+# Snapshot Infrastructure
+#
+# Purpose:
+# Install the Kubernetes Volume Snapshot CRDs, Snapshot Controller,
+# and VolumeSnapshotClass required for EBS snapshots.
+# --------------------------------------------------------------------
+
+print_banner "Installing Snapshot Infrastructure"
+
+bash k8s/snapshot/install.sh
+
+echo "✓ Snapshot infrastructure installed."
+
 # ------------------------------------------------------------
 # Storage Resources
 #
@@ -258,3 +272,44 @@ echo "✓ Temporary Terraform files removed."
 echo ""
 
 print_banner "Deployment Complete!"
+
+print_banner "Deployment Verification"
+
+echo ""
+echo "Nodes:"
+kubectl get nodes
+
+echo ""
+echo "Storage Classes:"
+kubectl get storageclass
+
+echo ""
+echo "Volume Snapshot Classes:"
+kubectl get volumesnapshotclass
+
+echo ""
+echo "Snapshot Controller:"
+kubectl get deployment snapshot-controller -n kube-system
+
+echo ""
+echo "EBS CSI Controller:"
+kubectl get deployment ebs-csi-controller -n kube-system
+
+echo ""
+echo "Jenkins:"
+kubectl get all -n jenkins
+
+echo ""
+echo "Ingress:"
+kubectl get ingress -n jenkins
+
+echo ""
+echo "PVC:"
+kubectl get pvc -n jenkins
+
+echo ""
+echo "PV:"
+kubectl get pv
+
+echo ""
+echo "✓ Deployment verification complete."
