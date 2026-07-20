@@ -1,4 +1,13 @@
-# EKS Cluster role
+# -----------------------------------------------------------------------------
+# EKS Cluster IAM Role
+#
+# Purpose:
+# IAM role assumed by the Amazon EKS control plane.
+#
+# This role allows AWS to manage the Kubernetes control plane,
+# including communication with worker nodes and other AWS services
+# required by the cluster.
+# -----------------------------------------------------------------------------
 
 resource "aws_iam_role" "eks_cluster_role" {
   name = var.eks_cluster_role_name
@@ -17,9 +26,14 @@ resource "aws_iam_role" "eks_cluster_role" {
   })
 }
 
-# Policy attachment for EKS Cluster Role
+# -----------------------------------------------------------------------------
+# EKS Cluster Policy Attachment
+#
+# Purpose:
+# Attaches the AWS-managed AmazonEKSClusterPolicy to the EKS Cluster IAM Role.
+# -----------------------------------------------------------------------------
 
-resource "aws_iam_role_policy_attachment" "eks_cluster_role_policy_attachment" {
+resource "aws_iam_role_policy_attachment" "amazon_eks_cluster_policy_attachment" {
   role       = aws_iam_role.eks_cluster_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }

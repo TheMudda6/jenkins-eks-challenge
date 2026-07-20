@@ -1,14 +1,19 @@
-resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-  tags = {
-    Name        = var.vpc_name
+locals {
+  common_tags = {
     Environment = var.environment
     Project     = var.project_name
     Owner       = var.owner
   }
 }
+
+resource "aws_vpc" "main" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+  tags = merge(local.common_tags, {
+  Name = var.vpc_name
+})
+  }
 
 resource "aws_subnet" "private" {
 
@@ -23,8 +28,18 @@ resource "aws_subnet" "private" {
 }
 
 # TODO:
-# Refactor to use objects/maps instead of matching two separate lists.
-# This will make subnet-to-AZ mapping clearer and easier to maintain.
+# Refactor subnet configuration to use a map/object instead of relying on
+# matching indexes between two separate lists.
+#
+# Example:
+#
+# private_subnets = {
+#   eu-west-2a = "10.0.1.0/24"
+#   eu-west-2b = "10.0.2.0/24"
+# }
+#
+# This removes the dependency on list ordering, improves readability,
+# and makes Availability Zone assignments explicit.
 
 resource "aws_subnet" "public" {
   for_each = toset(var.public_subnets)
@@ -39,22 +54,16 @@ resource "aws_subnet" "public" {
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
-  tags = {
-    Name        = "${var.vpc_name}-igw"
-    Environment = var.environment
-    Project     = var.project_name
-    Owner       = var.owner
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.vpc_name}-igw"
+  })
 }
 
 resource "aws_route_table" "public" {
 
-  tags = {
-    Name        = "${var.vpc_name}-public-rt"
-    Environment = var.environment
-    Project     = var.project_name
-    Owner       = var.owner
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.vpc_name}-public-rt"
+  })
 
   vpc_id = aws_vpc.main.id
 
@@ -66,12 +75,9 @@ resource "aws_route_table" "public" {
 
 resource "aws_route_table" "private" {
 
-  tags = {
-    Name        = "${var.vpc_name}-private-rt"
-    Environment = var.environment
-    Project     = var.project_name
-    Owner       = var.owner
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.vpc_name}-private-rt"
+  })
 
 
   vpc_id = aws_vpc.main.id
@@ -102,25 +108,31 @@ resource "aws_eip" "nat" {
 
   domain = "vpc"
 
-  tags = {
-    Name        = "${var.vpc_name}-nat-eip"
-    Environment = var.environment
-    Project     = var.project_name
-    Owner       = var.owner
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.vpc_name}-nat-eip"
+  })
 }
+
+# -----------------------------------------------------------------------------
+# NAT Gateway
+#
+# Purpose:
+# Provides outbound internet access for resources in private subnets.
+#
+# Design Decision:
+# A single NAT Gateway is used to reduce AWS costs for this portfolio project.
+# In a production environment, a NAT Gateway would typically be deployed in
+# each Availability Zone for higher availability.
+# -----------------------------------------------------------------------------
 
 resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.nat.id
 
   subnet_id = values(aws_subnet.public)[0].id
 
-  tags = {
-    Name        = "${var.vpc_name}-nat-gateway"
-    Environment = var.environment
-    Project     = var.project_name
-    Owner       = var.owner
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.vpc_name}-nat-gateway"
+  })
 }
 
 

@@ -28,6 +28,8 @@ data "aws_iam_policy_document" "ebs_csi_assume_role" {
       test     = "StringEquals"
       variable = "${replace(var.cluster_oidc_issuer_url, "https://", "")}:sub"
 
+      # Restrict role assumption to the EBS CSI Controller Service Account.
+
       values = [
         "system:serviceaccount:kube-system:ebs-csi-controller-sa"
       ]
@@ -44,8 +46,8 @@ data "aws_iam_policy_document" "ebs_csi_assume_role" {
 # Creates the IAM Role assumed by the EBS CSI Driver Service Account.
 # -----------------------------------------------------------------------------
 
-resource "aws_iam_role" "ebs_csi" {
-  name = "AmazonEKS_EBS_CSI_DriverRole"
+resource "aws_iam_role" "ebs_csi_driver_role" {
+  name = var.ebs_csi_driver_role_name
 
   assume_role_policy = data.aws_iam_policy_document.ebs_csi_assume_role.json
 }
@@ -59,7 +61,7 @@ resource "aws_iam_role" "ebs_csi" {
 # EBS volumes.
 # -----------------------------------------------------------------------------
 
-resource "aws_iam_role_policy_attachment" "ebs_csi" {
-  role       = aws_iam_role.ebs_csi.name
+resource "aws_iam_role_policy_attachment" "amazon_ebs_csi_driver_policy_attachment" {
+  role       = aws_iam_role.ebs_csi_driver_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }

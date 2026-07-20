@@ -22,9 +22,13 @@ data "tls_certificate" "eks" {
 
 resource "aws_iam_openid_connect_provider" "main" {
 
+  # Allow AWS Security Token Service (STS) to trust this OIDC provider.
+
   client_id_list = [
     "sts.amazonaws.com"
   ]
+
+# Use the EKS OIDC provider's TLS certificate thumbprint.
 
   thumbprint_list = [
     data.tls_certificate.eks.certificates[0].sha1_fingerprint

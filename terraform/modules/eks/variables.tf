@@ -1,3 +1,10 @@
+# -----------------------------------------------------------------------------
+# Cluster Configuration
+#
+# Purpose:
+# Defines the core configuration of the EKS control plane.
+# -----------------------------------------------------------------------------
+
 variable "cluster_name" {
   description = "The name of the EKS cluster."
   type        = string
@@ -15,10 +22,24 @@ variable "tags" {
   default     = {}
 }
 
+# -----------------------------------------------------------------------------
+# Networking
+#
+# Purpose:
+# Defines where the EKS cluster and worker nodes are deployed.
+# -----------------------------------------------------------------------------
+
 variable "subnet_ids" {
   description = "A list of subnet IDs where the EKS cluster will be deployed."
   type        = list(string)
 }
+
+# -----------------------------------------------------------------------------
+# IAM Roles
+#
+# Purpose:
+# Defines the IAM roles used by the EKS cluster, worker nodes and add-ons.
+# -----------------------------------------------------------------------------
 
 variable "cluster_role_arn" {
   description = "The ARN of the IAM role that EKS will use to manage the cluster."
@@ -29,6 +50,13 @@ variable "node_role_arn" {
   description = "The ARN of the IAM role that EKS worker nodes will use."
   type        = string
 }
+
+# -----------------------------------------------------------------------------
+# Managed Node Group
+#
+# Purpose:
+# Defines the scaling and EC2 configuration for worker nodes.
+# -----------------------------------------------------------------------------
 
 variable "desired_size" {
   description = "The desired number of worker nodes in the EKS node group."
