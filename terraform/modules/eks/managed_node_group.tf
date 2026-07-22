@@ -16,12 +16,12 @@ resource "aws_eks_node_group" "main" {
   subnet_ids      = var.subnet_ids
 
   # -----------------------------------------------------------------------------
-# Node Group Scaling
-#
-# Purpose:
-# Defines the minimum, desired and maximum number of worker nodes that
-# Auto Scaling can maintain for the cluster.
-# -----------------------------------------------------------------------------
+  # Node Group Scaling
+  #
+  # Purpose:
+  # Defines the minimum, desired and maximum number of worker nodes that
+  # Auto Scaling can maintain for the cluster.
+  # -----------------------------------------------------------------------------
 
   scaling_config {
     desired_size = var.desired_size
@@ -30,11 +30,11 @@ resource "aws_eks_node_group" "main" {
   }
 
   # -----------------------------------------------------------------------------
-# EC2 Instance Type
-#
-# Purpose:
-# Defines the EC2 instance type used for the worker nodes.
-# -----------------------------------------------------------------------------
+  # EC2 Instance Type
+  #
+  # Purpose:
+  # Defines the EC2 instance type used for the worker nodes.
+  # -----------------------------------------------------------------------------
 
   instance_types = [var.instance_type]
 

@@ -20,10 +20,27 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" 
   }
 }
 
+resource "aws_s3_bucket_public_access_block" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  block_public_acls       = true
+  ignore_public_acls      = true
+  block_public_policy     = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_ownership_controls" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
 terraform {
   backend "s3" {
     bucket = "mudassir-tf-state-893061519920"
-    key    = "jenkins/terraform.tfstate"
+    key = "bootstrap/terraform.tfstate"
     region = "eu-west-2"
   }
 }

@@ -28,7 +28,7 @@ resource "aws_iam_openid_connect_provider" "main" {
     "sts.amazonaws.com"
   ]
 
-# Use the EKS OIDC provider's TLS certificate thumbprint.
+  # Use the EKS OIDC provider's TLS certificate thumbprint.
 
   thumbprint_list = [
     data.tls_certificate.eks.certificates[0].sha1_fingerprint
