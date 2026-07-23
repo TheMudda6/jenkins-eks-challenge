@@ -240,3 +240,33 @@ variable "max_size" {
   type        = number
   default     = 2
 }
+
+# -----------------------------------------------------------------------------
+# Kubernetes Namespace for AWS Load Balancer Controller
+# -----------------------------------------------------------------------------
+
+variable "kubernetes_namespace" {
+  description = "Namespace where the AWS Load Balancer Controller will be installed."
+  type        = string
+  default     = "kube-system"
+}
+
+# -----------------------------------------------------------------------------
+# ALB Ingress Controller Version
+# -----------------------------------------------------------------------------
+
+variable "alb_ingress_controller_version" {
+  description = "Version of the AWS Load Balancer Controller Helm chart."
+  type        = string
+  default     = "1.4.0"
+}
+
+# -----------------------------------------------------------------------------
+# Helm namespace
+# -----------------------------------------------------------------------------
+
+variable "helm_kubernetes_namespace" {
+  description = "Namespace where Helm releases will be installed."
+  type        = string
+  default     = "kube-system"
+}

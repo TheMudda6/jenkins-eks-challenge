@@ -101,3 +101,23 @@ module "eks" {
 
   ebs_csi_driver_role_arn = module.iam.ebs_csi_driver_role_arn
 }
+
+# -----------------------------------------------------------------------------
+# Helm Module
+#
+# Purpose:
+# Installs the AWS Load Balancer Controller using Helm.
+#
+# Consumes:
+# - Cluster name from the EKS module
+# - Namespace from the Helm module variables
+# -----------------------------------------------------------------------------
+
+module "helm" {
+  source = "./modules/helm"
+
+  namespace                             = var.kubernetes_namespace
+  cluster_name                          = module.eks.cluster_name
+  alb_ingress_controller_version        = var.alb_ingress_controller_version
+  aws_load_balancer_controller_role_arn = module.iam.aws_load_balancer_controller_role_arn
+}
