@@ -1,3 +1,17 @@
+# -----------------------------------------------------------------------------
+# Providers
+#
+# Purpose:
+# Configures the Terraform providers required by the root module. These
+# providers authenticate with AWS and Kubernetes and allow Terraform to manage
+# both cloud infrastructure and Kubernetes resources.
+#
+# Configures:
+# - AWS Provider
+# - Helm Provider
+# - Kubernetes Provider
+# -----------------------------------------------------------------------------
+
 terraform {
   required_version = ">= 1.5.0"
 

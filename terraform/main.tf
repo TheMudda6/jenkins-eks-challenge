@@ -121,3 +121,30 @@ module "helm" {
   alb_ingress_controller_version        = var.alb_ingress_controller_version
   aws_load_balancer_controller_role_arn = module.iam.aws_load_balancer_controller_role_arn
 }
+
+# -----------------------------------------------------------------------------
+# Storage Module
+#
+# Purpose:
+# Deploys and configures persistent storage for the EKS cluster by installing
+# the Amazon EBS CSI Driver and defining Kubernetes StorageClasses for dynamic
+# volume provisioning.
+#
+# Consumes:
+# - EKS Module:
+#     - cluster_name
+#
+# - IAM Module:
+#     - ebs_csi_driver_role_arn
+# -----------------------------------------------------------------------------
+
+module "storage" {
+  source = "./modules/storage"
+
+  # EKS Module Output
+  cluster_name = module.eks.cluster_name
+
+  # IAM Module Output
+  ebs_csi_role_arn = module.iam.ebs_csi_driver_role_arn
+
+}
