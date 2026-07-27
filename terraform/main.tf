@@ -152,3 +152,14 @@ module "storage" {
   ebs_csi_role_arn = module.iam.ebs_csi_driver_role_arn
 
 }
+
+module "cloudflare" {
+
+  source = "./modules/cloudflare"
+
+  zone_id = var.cloudflare_zone_id
+
+  hostname = "jenkins"
+
+  target_hostname = kubernetes_ingress_v1.jenkins.status[0].load_balancer[0].ingress[0].hostname
+}

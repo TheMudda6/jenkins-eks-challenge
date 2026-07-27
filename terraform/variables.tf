@@ -270,3 +270,21 @@ variable "helm_kubernetes_namespace" {
   type        = string
   default     = "kube-system"
 }
+
+# -----------------------------------------------------------------------------
+# ACM Certificate ARN
+# -----------------------------------------------------------------------------
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN for the Jenkins ALB."
+  type        = string
+}
+
+# -----------------------------------------------------------------------------
+# Cloudflare Zone ID
+# -----------------------------------------------------------------------------
+
+variable "cloudflare_zone_id" {
+  description = "Cloudflare Zone ID."
+  type        = string
+}

@@ -5,6 +5,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT/terraform"
 
+source "$SCRIPT_DIR/common.sh"
+
 set -euo pipefail
 
 trap 'echo ""; echo "ERROR: Cleanup failed on line $LINENO"; exit 1' ERR
@@ -21,21 +23,6 @@ export AWS_PAGER=""
 AWS_REGION="eu-west-2"
 CLUSTER_NAME="jenkins-eks"
 NAMESPACE="jenkins"
-
-# --------------------------------------------------------------------
-# Helper Functions
-#
-# Purpose:
-# Reusable functions used throughout the cleanup.
-# --------------------------------------------------------------------
-
-print_banner() {
-    echo
-    echo "====================================="
-    echo "$1"
-    echo "====================================="
-    echo
-}
 
 # --------------------------------------------------------------------
 # Prerequisite Checks
@@ -75,6 +62,12 @@ if [ "$confirm" != "yes" ]; then
 fi
 
 # --------------------------------------------------------------------
+# Note:
+# The Jenkins Ingress is managed by Terraform and is destroyed during
+# the Terraform destroy phase. It is intentionally not deleted here.
+# --------------------------------------------------------------------
+
+# --------------------------------------------------------------------
 # Kubernetes Cleanup
 #
 # Purpose:
@@ -86,16 +79,6 @@ print_banner "Cleaning Kubernetes Resources"
 echo "Checking cluster connectivity..."
 
 kubectl get nodes
-
-echo "Deleting Jenkins ingress..."
-
-kubectl delete -f k8s/jenkins-ingress.yaml --ignore-not-found=true
-
-echo "✓ Jenkins ingress deleted."
-
-echo "Waiting for AWS Load Balancer cleanup..."
-
-sleep 120
 
 echo "Deleting Jenkins service..."
 

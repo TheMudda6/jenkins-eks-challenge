@@ -1,3 +1,9 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/../../scripts/common.sh"
+
 print_banner "Installing Snapshot Infrastructure"
 
 echo "Installing Volume Snapshot CRDs..."

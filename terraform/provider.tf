@@ -3,13 +3,14 @@
 #
 # Purpose:
 # Configures the Terraform providers required by the root module. These
-# providers authenticate with AWS and Kubernetes and allow Terraform to manage
-# both cloud infrastructure and Kubernetes resources.
+# providers authenticate with AWS, Kubernetes and Cloudflare, allowing
+# Terraform to manage cloud infrastructure, Kubernetes resources and DNS.
 #
 # Configures:
 # - AWS Provider
 # - Helm Provider
 # - Kubernetes Provider
+# - Cloudflare Provider
 # -----------------------------------------------------------------------------
 
 terraform {
@@ -24,12 +25,16 @@ terraform {
     helm = {
       source  = "hashicorp/helm"
       version = "~> 2.13"
-
     }
 
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.23"
+    }
+
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
     }
   }
 }
@@ -54,7 +59,6 @@ provider "helm" {
 }
 
 provider "kubernetes" {
-
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
 
@@ -70,3 +74,5 @@ provider "kubernetes" {
     ]
   }
 }
+
+provider "cloudflare" {}

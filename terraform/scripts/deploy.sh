@@ -5,6 +5,8 @@ TERRAFORM_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$TERRAFORM_DIR"
 
+source "$SCRIPT_DIR/common.sh"
+
 echo "Working directory: $(pwd)"
 
 ls
@@ -23,21 +25,6 @@ trap 'echo ""; echo "ERROR: Deployment failed on line $LINENO"; exit 1' ERR
 AWS_REGION="eu-west-2"
 CLUSTER_NAME="jenkins-eks"
 NAMESPACE="jenkins"
-
-# --------------------------------------------------------------------
-# Helper Functions
-#
-# Purpose:
-# Reusable functions used throughout the deployment.
-# --------------------------------------------------------------------
-
-print_banner() {
-    echo
-    echo "====================================="
-    echo "$1"
-    echo "====================================="
-    echo
-}
 
 # --------------------------------------------------------------------
 # Prerequisite Checks
@@ -235,11 +222,9 @@ kubectl get svc -n "$NAMESPACE"
 
 echo "✓ Service status verified"
 
-print_banner "Creating Ingress"
+print_banner "Verifying Ingress"
 
-kubectl apply -f k8s/jenkins-ingress.yaml
-
-echo "✓ Waiting for Ingress to be created and assigned a hostname..."
+echo "✓ Waiting for Ingress to be be assigned a hostname..."
 
 kubectl wait \
   --for=jsonpath='{.status.loadBalancer.ingress[0].hostname}' \
@@ -247,7 +232,7 @@ kubectl wait \
   -n "$NAMESPACE" \
   --timeout=300s
 
-echo "✓ Ingress created and hostname assigned"
+echo "✓ Ingress hostname assigned"
 
 echo ""
 echo "Ingress status:"
