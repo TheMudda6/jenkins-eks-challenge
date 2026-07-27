@@ -167,12 +167,6 @@ echo "✓ Snapshot infrastructure installed."
 
 print_banner "Storage Resources"
 
-echo "Creating gp3 StorageClass..."
-
-kubectl apply -f k8s/storage/gp3-storageclass.yaml
-
-echo "✓ gp3 StorageClass created."
-
 echo "Creating gp3-retain StorageClass..."
 
 kubectl apply -f k8s/storage/gp3-retain-storageclass.yaml

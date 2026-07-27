@@ -251,14 +251,14 @@ variable "kubernetes_namespace" {
   default     = "kube-system"
 }
 
-# -----------------------------------------------------------------------------
-# ALB Ingress Controller Version
-# -----------------------------------------------------------------------------
+# --------------------------------------------------------------------
+# AWS Load Balancer Controller
+# --------------------------------------------------------------------
 
-variable "alb_ingress_controller_version" {
+variable "aws_load_balancer_controller_version" {
   description = "Version of the AWS Load Balancer Controller Helm chart."
   type        = string
-  default     = "1.4.0"
+  default     = "1.14.0"
 }
 
 # -----------------------------------------------------------------------------

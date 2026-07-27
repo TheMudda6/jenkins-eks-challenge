@@ -96,10 +96,6 @@ module "eks" {
   instance_type = var.instance_type
 
   tags = var.tags
-
-  # Existing configuration...
-
-  ebs_csi_driver_role_arn = module.iam.ebs_csi_driver_role_arn
 }
 
 # -----------------------------------------------------------------------------
@@ -116,11 +112,19 @@ module "eks" {
 module "helm" {
   source = "./modules/helm"
 
-  namespace                             = var.kubernetes_namespace
-  cluster_name                          = module.eks.cluster_name
-  alb_ingress_controller_version        = var.alb_ingress_controller_version
+  cluster_name = module.eks.cluster_name
+
+  aws_load_balancer_controller_namespace = "kube-system"
+
+  aws_load_balancer_controller_version = var.aws_load_balancer_controller_version
+
   aws_load_balancer_controller_role_arn = module.iam.aws_load_balancer_controller_role_arn
+
+  aws_region = var.aws_region
+
+  vpc_id = module.vpc.vpc_id
 }
+
 
 # -----------------------------------------------------------------------------
 # Storage Module
