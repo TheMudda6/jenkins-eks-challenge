@@ -288,3 +288,9 @@ variable "cloudflare_zone_id" {
   description = "Cloudflare Zone ID."
   type        = string
 }
+
+variable "postgres_password" {
+  description = "PostgreSQL administrator password"
+  type        = string
+  sensitive   = true
+}

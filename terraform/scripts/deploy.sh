@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Terraform provisions:
+- AWS infrastructure
+- Kubernetes infrastructure
+
+deploy.sh:
+- Orchestrates deployment
+- Waits for controllers
+- Performs health checks
+- Verifies platform readiness
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="$(dirname "$SCRIPT_DIR")"
 
@@ -77,6 +87,35 @@ terraform validate
 
 echo "✓ Terraform validation complete. "
 
+print_banner "Preparing Kubernetes"
+
+#
+# Purpose:
+# Refresh the local kubeconfig if an EKS cluster already exists.
+# This ensures Terraform and kubectl communicate with the current
+# Kubernetes API endpoint.
+#
+
+echo "Checking for an existing EKS cluster..."
+
+if aws eks describe-cluster \
+    --region "$AWS_REGION" \
+    --name "$CLUSTER_NAME" >/dev/null 2>&1; then
+
+    echo "Existing cluster found. Updating kubeconfig..."
+
+    aws eks update-kubeconfig \
+        --region "$AWS_REGION" \
+        --name "$CLUSTER_NAME"
+
+    echo "✓ kubeconfig updated"
+
+else
+
+    echo "No existing cluster found. Terraform will create one."
+
+fi
+
 # --------------------------------------------------------------------
 # Terraform Plan & Apply
 #
@@ -99,11 +138,21 @@ terraform apply -auto-approve tfplan
 
 echo "✓ Terraform apply complete."
 
+#
+# Purpose:
+# Update the local kubeconfig so kubectl points to the
+# EKS cluster created by Terraform.
+#
+
 print_banner "Configuring Kubernetes"
 
 aws eks update-kubeconfig \
   --region "$AWS_REGION" \
   --name "$CLUSTER_NAME"
+
+  kubectl cluster-info > /dev/null
+
+echo "✓ Connected to Kubernetes cluster"
 
 kubectl get nodes
 
@@ -149,64 +198,54 @@ echo "✓ Snapshot infrastructure installed."
 # Storage Resources
 #
 # Purpose:
-# Configure Kubernetes StorageClasses used by workloads.
+# Verify the Kubernetes StorageClasses created by Terraform.
 # ------------------------------------------------------------
 
-print_banner "Storage Resources"
+print_banner "Verifying Storage"
 
-echo "Creating gp3-retain StorageClass..."
-
-kubectl apply -f k8s/storage/gp3-retain-storageclass.yaml
-
-echo "✓ gp3-retain StorageClass created."
-
-echo ""
 echo "Current StorageClasses:"
 
 kubectl get storageclass
 
 echo "✓ Storage resources verified."
 
-print_banner "Deploying Jenkins"
+# ------------------------------------------------------------
+# Kubernetes Workloads
+#
+# Purpose:
+# Deploy Kubernetes application workloads that are not yet
+# managed by Terraform.
+# ------------------------------------------------------------
 
-kubectl create namespace "$NAMESPACE" \
-  --dry-run=client -o yaml | kubectl apply -f -
+print_banner "Verifying Kubernetes Workloads"
 
-echo "✓ Namespace created."
-
-kubectl apply -f k8s/jenkins-pvc.yaml
-
-echo "✓ PVC created"
-
-kubectl apply -f k8s/jenkins-deployment.yaml
-
-echo "✓ Deployment created"
-
-kubectl apply -f k8s/jenkins-service.yaml
-
-echo "✓ Service created"
+#
+# Purpose:
+# Wait for the Terraform-managed Kubernetes resources
+# to become ready before continuing.
+#
 
 echo ""
 echo "Waiting for the Jenkins pod to become Ready..."
 echo "This can take several minutes while the image is downloaded and started."
-echo "Please do not close the terminal or press Ctrl+C, the deployment will continue automatically once the pod is Ready."
+echo "Please do not close the terminal or press Ctrl+C."
 echo ""
 
 kubectl wait \
-  --for=condition=ready pod \
-  -l app=jenkins \
-  -n "$NAMESPACE" \
-  --timeout=300s
+    --for=condition=ready pod \
+    -l app=jenkins \
+    -n "$NAMESPACE" \
+    --timeout=300s
 
 echo "✓ Jenkins pod is ready"
 
 sleep 10
 
 kubectl wait \
-  --for=jsonpath='{.status.phase}'=Bound \
-  pvc/jenkins-pvc \
-  -n "$NAMESPACE" \
-  --timeout=120s
+    --for=jsonpath='{.status.phase}'=Bound \
+    pvc/jenkins-pvc \
+    -n "$NAMESPACE" \
+    --timeout=120s
 
 echo "✓ PVC is successfully bound"
 

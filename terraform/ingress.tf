@@ -13,9 +13,13 @@
 
 resource "kubernetes_ingress_v1" "jenkins" {
 
+  depends_on = [
+    kubernetes_namespace.jenkins
+  ]
+
   metadata {
     name      = "jenkins-ingress"
-    namespace = "jenkins"
+    namespace = kubernetes_namespace.jenkins.metadata[0].name
 
     annotations = {
       "kubernetes.io/ingress.class"               = "alb"

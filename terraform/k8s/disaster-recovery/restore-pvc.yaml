@@ -8,7 +8,7 @@ metadata:
   namespace: jenkins
 
 spec:
-  storageClassName: gp3
+  storageClassName: gp3-retain
 
   accessModes:
     - ReadWriteOnce

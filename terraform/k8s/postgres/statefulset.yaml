@@ -1,0 +1,65 @@
+# Stateful set hierarchy
+
+# StatefulSet
+#└── Pod Template
+ #   ├── metadata
+  #  └── spec
+   #     ├── securityContext   ← Applies to the whole Pod
+    #    └── containers
+     #       ├── postgres
+      #      ├── envFrom
+       #     └── volumeMounts
+
+apiVersion: apps/v1
+kind: StatefulSet
+
+metadata:
+  name: postgres
+
+spec:
+  serviceName: postgres
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: postgres
+
+# Template used to create PostgreSQL Pods
+
+  template:
+    metadata:
+      labels:
+        app: postgres
+
+    spec:
+
+      securityContext:
+        fsGroup: 999
+
+      containers:
+        - name: postgres
+          image: "postgres:17.6"
+
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+
+# Automatically create a PersistentVolumeClaim for each Pod
+
+    volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+
+      spec:
+        accessModes:
+          - ReadWriteOnce
+
+        storageClassName: kubernetes_storage_class.ebs_gp3_retain.metadata[0].name
+
+        resources:
+          requests:
+            storage: 20Gi

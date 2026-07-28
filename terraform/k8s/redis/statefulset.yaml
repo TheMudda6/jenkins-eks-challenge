@@ -1,0 +1,77 @@
+# StatefulSet hierarchy
+
+# StatefulSet
+#└── Pod Template
+#    ├── metadata
+#    └── spec
+#        └── containers
+#            ├── redis
+#            ├── envFrom
+#            └── volumeMounts
+
+apiVersion: apps/v1
+kind: StatefulSet
+
+metadata:
+  name: redis
+
+spec:
+  serviceName: redis
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: redis
+
+  # Template used to create Redis Pods
+  template:
+    metadata:
+      labels:
+        app: redis
+
+    spec:
+      containers:
+        - name: redis
+          image: redis:7
+
+          command:
+            - sh
+            - -c
+
+          args:
+            - redis-server --requirepass "$REDIS_PASSWORD"
+
+          envFrom:
+            - secretRef:
+                name: redis-secret
+
+          volumeMounts:
+            - name: redis-storage
+              mountPath: /data
+
+            # Readiness probe, only sends traffic to this pod once Redis is responding
+
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+  # Automatically create a PersistentVolumeClaim for each Pod
+
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-storage
+
+      spec:
+        accessModes:
+          - ReadWriteOnce
+
+        storageClassName: gp3-retain
+
+        resources:
+          requests:
+            storage: 20Gi
+

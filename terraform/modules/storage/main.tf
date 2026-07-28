@@ -50,3 +50,33 @@ resource "kubernetes_storage_class" "ebs_gp3" {
     aws_eks_addon.ebs_csi_driver
   ]
 }
+
+#
+# Retain EBS Storage Class
+#
+# Purpose:
+# Provides persistent storage that preserves the
+# underlying EBS volume even if the PersistentVolumeClaim
+# is deleted. Used for stateful workloads such as
+# Jenkins, PostgreSQL and Redis.
+#
+
+resource "kubernetes_storage_class" "ebs_gp3_retain" {
+
+  metadata {
+    name = "gp3-retain"
+  }
+
+  storage_provisioner = "ebs.csi.aws.com"
+
+  parameters = {
+    type = "gp3"
+  }
+
+  reclaim_policy      = "Retain"
+  volume_binding_mode = "WaitForFirstConsumer"
+
+  depends_on = [
+    aws_eks_addon.ebs_csi_driver
+  ]
+}
