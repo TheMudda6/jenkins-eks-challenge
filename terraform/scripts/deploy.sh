@@ -217,6 +217,14 @@ echo "✓ Storage resources verified."
 # managed by Terraform.
 # ------------------------------------------------------------
 
+# ------------------------------------------------------------
+# Kubernetes Workloads
+#
+# Purpose:
+# Verify Terraform-managed Kubernetes workloads are running
+# and healthy before continuing.
+# ------------------------------------------------------------
+
 print_banner "Verifying Kubernetes Workloads"
 
 #
@@ -226,8 +234,8 @@ print_banner "Verifying Kubernetes Workloads"
 #
 
 echo ""
-echo "Waiting for the Jenkins pod to become Ready..."
-echo "This can take several minutes while the image is downloaded and started."
+echo "Waiting for the Kubernetes workloads to become Ready..."
+echo "This can take several minutes while the images are downloaded and started."
 echo "Please do not close the terminal or press Ctrl+C."
 echo ""
 
@@ -239,27 +247,49 @@ kubectl wait \
 
 echo "✓ Jenkins pod is ready"
 
-sleep 10
+kubectl wait \
+    --for=condition=ready pod \
+    -l app=postgres \
+    -n "$NAMESPACE" \
+    --timeout=300s
+
+echo "✓ PostgreSQL pod is ready"
 
 kubectl wait \
-    --for=jsonpath='{.status.phase}'=Bound \
-    pvc/jenkins-pvc \
+    --for=condition=ready pod \
+    -l app=redis \
     -n "$NAMESPACE" \
-    --timeout=120s
+    --timeout=300s
 
-echo "✓ PVC is successfully bound"
+echo "✓ Redis pod is ready"
 
-kubectl get pods -n "$NAMESPACE"
-
-echo "✓ Pod status verified"
+echo ""
+echo "Verifying Persistent Volume Claims..."
 
 kubectl get pvc -n "$NAMESPACE"
 
 echo "✓ PVC status verified"
 
+echo ""
+echo "Verifying Pods..."
+
+kubectl get pods -n "$NAMESPACE"
+
+echo "✓ Pod status verified"
+
+echo ""
+echo "Verifying Services..."
+
 kubectl get svc -n "$NAMESPACE"
 
 echo "✓ Service status verified"
+
+echo ""
+echo "Verifying StatefulSets..."
+
+kubectl get statefulset -n "$NAMESPACE"
+
+echo "✓ StatefulSet status verified"
 
 print_banner "Verifying Ingress"
 
@@ -314,16 +344,20 @@ echo "EBS CSI Controller:"
 kubectl get deployment ebs-csi-controller -n kube-system
 
 echo ""
-echo "Jenkins:"
-kubectl get all -n jenkins
+echo "Workloads:"
+kubectl get all -n "$NAMESPACE"
+
+echo ""
+echo "StatefulSets:"
+kubectl get statefulset -n "$NAMESPACE"
 
 echo ""
 echo "Ingress:"
-kubectl get ingress -n jenkins
+kubectl get ingress -n "$NAMESPACE"
 
 echo ""
 echo "PVC:"
-kubectl get pvc -n jenkins
+kubectl get pvc -n "$NAMESPACE"
 
 echo ""
 echo "PV:"

@@ -294,3 +294,9 @@ variable "postgres_password" {
   type        = string
   sensitive   = true
 }
+
+variable "redis_password" {
+  description = "Redis password"
+  type        = string
+  sensitive   = true
+}
