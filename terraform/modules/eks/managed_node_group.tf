@@ -14,6 +14,7 @@ resource "aws_eks_node_group" "main" {
   node_group_name = "${var.cluster_name}-node-group"
   node_role_arn   = var.node_role_arn
   subnet_ids      = var.subnet_ids
+  ami_type        = "AL2023_x86_64_STANDARD"
 
   # -----------------------------------------------------------------------------
   # Node Group Scaling
