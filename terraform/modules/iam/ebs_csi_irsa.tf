@@ -26,7 +26,7 @@ data "aws_iam_policy_document" "ebs_csi_assume_role" {
     }
 
     condition {
-      test     = "StringEquals"
+      test = "StringEquals"
 
       # AWS IAM condition keys use the OIDC issuer without the https:// prefix.
 

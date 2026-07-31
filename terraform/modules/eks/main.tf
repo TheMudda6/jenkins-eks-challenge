@@ -12,7 +12,7 @@ resource "aws_eks_cluster" "main" {
   name     = var.cluster_name
   role_arn = var.cluster_role_arn
   version  = var.cluster_version
-  
+
   # Defines which subnets the EKS control plane and managed networking
   # components use for cluster communication.
 
