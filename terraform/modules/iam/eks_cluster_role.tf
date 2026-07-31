@@ -31,10 +31,11 @@ resource "aws_iam_role" "eks_cluster_role" {
 #
 # Purpose:
 # Attaches the AWS-managed AmazonEKSClusterPolicy to the EKS Cluster IAM Role.
+# This policy grants the permissions required for the Amazon EKS control plane
+# to manage cluster resources on your behalf.
 # -----------------------------------------------------------------------------
 
 resource "aws_iam_role_policy_attachment" "amazon_eks_cluster_policy_attachment" {
   role       = aws_iam_role.eks_cluster_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
-

@@ -57,11 +57,14 @@ resource "aws_iam_role" "aws_load_balancer_controller_role" {
 # Purpose:
 # Creates the IAM Policy required by the AWS Load Balancer Controller.
 #
-# The policy is stored separately in iam_policy.json because it is based on the
-# official AWS Load Balancer Controller IAM policy published by AWS.
+# This policy is based on the official AWS Load Balancer Controller IAM policy
+# published by AWS.
 #
-# Review the upstream policy when upgrading the controller version to ensure
-# any new permissions are incorporated.
+# It is intentionally stored as a separate JSON file to preserve the upstream
+# structure and simplify future upgrades.
+#
+# Review the latest AWS-published policy whenever upgrading the controller
+# version, and incorporate any required permission changes.
 # -----------------------------------------------------------------------------
 
 resource "aws_iam_policy" "aws_load_balancer_controller_policy" {

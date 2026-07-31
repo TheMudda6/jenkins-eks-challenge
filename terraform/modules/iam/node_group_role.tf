@@ -4,8 +4,10 @@
 # Purpose:
 # IAM role assumed by EC2 instances in the EKS Managed Node Group.
 #
-# This role allows worker nodes to join the Kubernetes cluster,
-# pull container images from Amazon ECR and manage pod networking.
+# This role allows worker nodes to:
+# - Join the Kubernetes cluster,
+# - Pull container images from Amazon ECR 
+# - Manage pod networking.
 # --------------------------------------------------------------------------------------
 
 resource "aws_iam_role" "node_group_role" {

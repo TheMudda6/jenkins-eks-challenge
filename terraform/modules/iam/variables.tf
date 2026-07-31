@@ -18,7 +18,7 @@ variable "node_group_role_name" {
 # -----------------------------------------------------------------------------
 
 variable "eks_cluster_role_name" {
-  description = "Name of the EKS cluster role"
+  description = "Name of the EKS cluster IAM role."
   type        = string
 }
 
@@ -30,7 +30,7 @@ variable "eks_cluster_role_name" {
 # -----------------------------------------------------------------------------
 
 variable "oidc_provider_arn" {
-  description = "ARN of the EKS OIDC provider"
+  description = "ARN of the EKS OIDC provider."
   type        = string
 }
 
@@ -38,11 +38,13 @@ variable "oidc_provider_arn" {
 # Cluster OIDC Issuer URL
 #
 # Purpose:
-# Defines the OpenID Connect (OIDC) issuer URL for the EKS cluster. This is used to create IAM Roles for Service Accounts (IRSA) that allow Kubernetes Service Accounts to assume IAM Roles.
+# Defines the OpenID Connect (OIDC) issuer URL for the EKS cluster.
+# This is used to create IAM Roles for Service Accounts (IRSA).
+# allowING Kubernetes Service Accounts to assume IAM Roles.
 # -----------------------------------------------------------------------------
 
 variable "cluster_oidc_issuer_url" {
-  description = "OIDC issuer URL for the EKS cluster"
+  description = "OIDC issuer URL for the EKS cluster."
   type        = string
 }
 
@@ -54,7 +56,7 @@ variable "cluster_oidc_issuer_url" {
 # -----------------------------------------------------------------------------
 
 variable "ebs_csi_driver_role_name" {
-  description = "Name of the IAM Role for the EBS CSI Driver"
+  description = "Name of the IAM Role for the EBS CSI Driver."
   type        = string
 }
 
@@ -66,7 +68,7 @@ variable "ebs_csi_driver_role_name" {
 # -----------------------------------------------------------------------------
 
 variable "aws_load_balancer_controller_role_name" {
-  description = "Name of the IAM Role for the AWS Load Balancer Controller"
+  description = "Name of the IAM Role for the AWS Load Balancer Controller."
   type        = string
 }
 
@@ -78,6 +80,6 @@ variable "aws_load_balancer_controller_role_name" {
 # -----------------------------------------------------------------------------
 
 variable "aws_load_balancer_controller_policy_name" {
-  description = "Name of the IAM Policy for the AWS Load Balancer Controller"
+  description = "Name of the IAM Policy for the AWS Load Balancer Controller."
   type        = string
 }

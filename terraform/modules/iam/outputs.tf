@@ -20,13 +20,13 @@ output "node_group_role_arn" {
 output "aws_load_balancer_controller_role_arn" {
   value = aws_iam_role.aws_load_balancer_controller_role.arn
 
-  description = "ARN of the AWS Load Balancer Controller IAM Role"
+  description = "ARN of the AWS Load Balancer Controller IAM role."
 }
 
 output "ebs_csi_driver_role_arn" {
   value = aws_iam_role.ebs_csi_driver_role.arn
 
-  description = "ARN of the EBS CSI Driver IAM Role"
+  description = "ARN of the EBS CSI Driver IAM role."
 }
 
 

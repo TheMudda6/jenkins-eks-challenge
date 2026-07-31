@@ -11,8 +11,9 @@
 # Assume Role Policy
 #
 # Purpose:
-# Defines which Kubernetes Service Account is allowed to assume this IAM Role
-# using the cluster's OpenID Connect (OIDC) provider.
+# Defines the trust relationship that allows the EBS CSI Driver
+# Service Account to assume this IAM Role through the cluster's
+# OpenID Connect (OIDC) provider.
 # -----------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "ebs_csi_assume_role" {
@@ -26,6 +27,9 @@ data "aws_iam_policy_document" "ebs_csi_assume_role" {
 
     condition {
       test     = "StringEquals"
+
+      # AWS IAM condition keys use the OIDC issuer without the https:// prefix.
+
       variable = "${replace(var.cluster_oidc_issuer_url, "https://", "")}:sub"
 
       # Restrict role assumption to the EBS CSI Controller Service Account.
@@ -56,7 +60,7 @@ resource "aws_iam_role" "ebs_csi_driver_role" {
 # IAM Policy Attachment
 #
 # Purpose:
-# Attaches the AWS managed AmazonEBSCSIDriverPolicy to the IAM Role,
+# Attaches the AWS-managed AmazonEBSCSIDriverPolicy to the IAM Role,
 # granting permissions to create, attach, detach and manage Amazon
 # EBS volumes.
 # -----------------------------------------------------------------------------
