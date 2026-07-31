@@ -1,3 +1,10 @@
+# -----------------------------------------------------------------------------
+# Common Resource Tags
+#
+# Purpose:
+# Defines tags shared by all AWS resources created within this module.
+# -----------------------------------------------------------------------------
+
 locals {
   common_tags = {
     Environment = var.environment
@@ -5,6 +12,13 @@ locals {
     Owner       = var.owner
   }
 }
+
+# -----------------------------------------------------------------------------
+# Virtual Private Cloud (VPC)
+#
+# Purpose:
+# Creates the private network that contains all infrastructure for the project.
+# -----------------------------------------------------------------------------
 
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
@@ -14,6 +28,14 @@ resource "aws_vpc" "main" {
     Name = var.vpc_name
   })
 }
+
+# -----------------------------------------------------------------------------
+# Private Subnets
+#
+# Purpose:
+# Creates the private subnets that host Kubernetes worker nodes and application
+# workloads. These subnets are not directly accessible from the internet.
+# -----------------------------------------------------------------------------
 
 resource "aws_subnet" "private" {
 
@@ -41,6 +63,14 @@ resource "aws_subnet" "private" {
 # This removes the dependency on list ordering, improves readability,
 # and makes Availability Zone assignments explicit.
 
+# -----------------------------------------------------------------------------
+# Public Subnets
+#
+# Purpose:
+# Creates the public subnets that host internet-facing infrastructure such as
+# the NAT Gateway and Application Load Balancer.
+# -----------------------------------------------------------------------------
+
 resource "aws_subnet" "public" {
   for_each = toset(var.public_subnets)
 
@@ -51,13 +81,29 @@ resource "aws_subnet" "public" {
   availability_zone = element(var.availability_zones, index(var.public_subnets, each.value))
 }
 
+# -----------------------------------------------------------------------------
+# Internet Gateway
+#
+# Purpose:
+# Provides internet connectivity for resources deployed within public subnets.
+# -----------------------------------------------------------------------------
+
 resource "aws_internet_gateway" "main" {
+
   vpc_id = aws_vpc.main.id
 
   tags = merge(local.common_tags, {
     Name = "${var.vpc_name}-igw"
   })
 }
+
+# -----------------------------------------------------------------------------
+# Public Route Table
+#
+# Purpose:
+# Routes outbound internet traffic from public subnets through the Internet
+# Gateway.
+# -----------------------------------------------------------------------------
 
 resource "aws_route_table" "public" {
 
@@ -73,12 +119,19 @@ resource "aws_route_table" "public" {
   }
 }
 
+# -----------------------------------------------------------------------------
+# Private Route Table
+#
+# Purpose:
+# Routes outbound internet traffic from private subnets through the NAT Gateway
+# while preventing direct inbound internet access.
+# -----------------------------------------------------------------------------
+
 resource "aws_route_table" "private" {
 
   tags = merge(local.common_tags, {
     Name = "${var.vpc_name}-private-rt"
   })
-
 
   vpc_id = aws_vpc.main.id
 
@@ -88,6 +141,13 @@ resource "aws_route_table" "private" {
   }
 }
 
+# -----------------------------------------------------------------------------
+# Public Route Table Associations
+#
+# Purpose:
+# Associates each public subnet with the public route table.
+# -----------------------------------------------------------------------------
+
 resource "aws_route_table_association" "public" {
 
   for_each = aws_subnet.public
@@ -96,6 +156,13 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# -----------------------------------------------------------------------------
+# Private Route Table Associations
+#
+# Purpose:
+# Associates each private subnet with the private route table.
+# -----------------------------------------------------------------------------
+
 resource "aws_route_table_association" "private" {
 
   for_each = aws_subnet.private
@@ -103,6 +170,13 @@ resource "aws_route_table_association" "private" {
   subnet_id      = each.value.id
   route_table_id = aws_route_table.private.id
 }
+
+# -----------------------------------------------------------------------------
+# Elastic IP
+#
+# Purpose:
+# Allocates a static public IP address for the NAT Gateway.
+# -----------------------------------------------------------------------------
 
 resource "aws_eip" "nat" {
 
@@ -134,7 +208,3 @@ resource "aws_nat_gateway" "main" {
     Name = "${var.vpc_name}-nat-gateway"
   })
 }
-
-
-
-  

@@ -1,3 +1,12 @@
+# -----------------------------------------------------------------------------
+# VPC Name
+#
+# Purpose:
+# Defines the name assigned to the Virtual Private Cloud.
+# -----------------------------------------------------------------------------
+
+variable "vpc_name" {
+
 variable "vpc_name" {
   description = "Name of the VPC"
   type        = string
@@ -29,11 +38,11 @@ variable "environment" {
 }
 
 variable "project_name" {
-  description = "The name of the project for which the VPC is being created"
+  description = "Project name used for naming and tagging resources."
   type        = string
 }
 
 variable "owner" {
-  description = "The owner of the VPC"
+  description = "Project owner used for resource tagging."
   type        = string
 }

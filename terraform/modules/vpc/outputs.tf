@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 
 output "private_subnets" {
-  description = "IDs of the private subnets."
+  description = "Private subnet IDs used by other Terraform modules."
   value       = values(aws_subnet.private)[*].id
 }
 
@@ -19,7 +19,7 @@ output "private_subnets" {
 # -----------------------------------------------------------------------------
 
 output "public_subnets" {
-  description = "IDs of the public subnets."
+  description = "Public subnet IDs used by internet-facing resources."
   value       = values(aws_subnet.public)[*].id
 }
 
@@ -31,6 +31,6 @@ output "public_subnets" {
 # -----------------------------------------------------------------------------
 
 output "vpc_id" {
-  description = "ID of the VPC."
+  description = "VPC ID used by dependent Terraform modules."
   value       = aws_vpc.main.id
 }

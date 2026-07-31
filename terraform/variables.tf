@@ -212,6 +212,15 @@ variable "instance_type" {
 }
 
 # -----------------------------------------------------------------------------
+# Worker Node Scaling
+#
+# Development environment.
+#
+# Keeps infrastructure costs low while still providing two worker nodes for
+# workload scheduling and high availability testing.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 # Minimum Worker Nodes
 # -----------------------------------------------------------------------------
 
