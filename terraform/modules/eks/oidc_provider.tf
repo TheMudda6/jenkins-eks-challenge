@@ -22,13 +22,15 @@ data "tls_certificate" "eks" {
 
 resource "aws_iam_openid_connect_provider" "main" {
 
-  # Allow AWS Security Token Service (STS) to trust this OIDC provider.
+  # Allow Kubernetes Service Accounts to obtain temporary AWS credentials
+  # by authenticating with AWS Security Token Service (STS).
 
   client_id_list = [
     "sts.amazonaws.com"
   ]
 
-  # Use the EKS OIDC provider's TLS certificate thumbprint.
+  # Register the OIDC provider's TLS certificate thumbprint so AWS can
+  # verify the identity provider during authentication.
 
   thumbprint_list = [
     data.tls_certificate.eks.certificates[0].sha1_fingerprint

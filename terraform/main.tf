@@ -33,8 +33,8 @@ module "vpc" {
 #
 # Purpose:
 # Creates the IAM Roles and Policies required by the EKS platform,
-# including the control plane, worker nodes and supporting Kubernetes
-# controllers.
+# including roles for the EKS control plane, worker nodes and Kubernetes
+# controllers using IAM Roles for Service Accounts (IRSA).
 # -----------------------------------------------------------------------------
 
 module "iam" {
@@ -96,8 +96,6 @@ module "eks" {
   instance_type = var.instance_type
 
   tags = var.tags
-
-  # Existing configuration...
 
   ebs_csi_driver_role_arn = module.iam.ebs_csi_driver_role_arn
 }
