@@ -1,3 +1,10 @@
+# -----------------------------------------------------------------------------
+# EKS Cluster Outputs
+#
+# Purpose:
+# Exposes core EKS cluster information for use by other Terraform modules.
+# -----------------------------------------------------------------------------
+
 output "cluster_name" {
   description = "The name of the EKS cluster."
   value       = aws_eks_cluster.main.name
@@ -27,7 +34,7 @@ output "node_group_name" {
 # -----------------------------------------------------------------------------
 
 output "cluster_oidc_issuer_url" {
-  description = "OIDC issuer URL for the EKS cluster."
+  description = "OIDC issuer URL used by IAM Roles for Service Accounts (IRSA)."
   value       = aws_eks_cluster.main.identity[0].oidc[0].issuer
 }
 
@@ -40,7 +47,9 @@ output "cluster_oidc_issuer_url" {
 # -----------------------------------------------------------------------------
 
 output "oidc_provider" {
-  description = "OIDC provider identifier without the https:// prefix."
+  description = "OIDC provider identifier without the https:// prefix, used in IAM trust policy conditions."
+  # AWS IAM trust policy condition keys require the OIDC issuer
+  # without the https:// prefix.
   value = replace(
     aws_eks_cluster.main.identity[0].oidc[0].issuer,
     "https://",
@@ -49,6 +58,6 @@ output "oidc_provider" {
 }
 
 output "oidc_provider_arn" {
-  description = "ARN of the IAM OIDC Provider."
+  description = "ARN of the IAM OIDC provider."
   value       = aws_iam_openid_connect_provider.main.arn
 }

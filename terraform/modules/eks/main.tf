@@ -12,6 +12,9 @@ resource "aws_eks_cluster" "main" {
   name     = var.cluster_name
   role_arn = var.cluster_role_arn
   version  = var.cluster_version
+  
+  # Defines which subnets the EKS control plane and managed networking
+  # components use for cluster communication.
 
   vpc_config {
     subnet_ids = var.subnet_ids
@@ -33,7 +36,8 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   addon_name               = "aws-ebs-csi-driver"
   service_account_role_arn = var.ebs_csi_driver_role_arn
 
-  # Overwrite existing add-on configuration if it already exists.
+  # Ensure Terraform replaces any existing EBS CSI Driver configuration
+  # so the cluster matches the desired state defined in code.
 
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"

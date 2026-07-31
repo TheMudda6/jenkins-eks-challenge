@@ -13,7 +13,7 @@ variable "cluster_name" {
 variable "cluster_version" {
   description = "The version of the EKS cluster."
   type        = string
-  default     = "1.30"
+  default     = "1.31"
 }
 
 variable "tags" {
@@ -83,6 +83,6 @@ variable "instance_type" {
 }
 
 variable "ebs_csi_driver_role_arn" {
-  description = "IAM Role ARN used by the Amazon EBS CSI Driver add-on."
+  description = "ARN of the IAM role used by the Amazon EBS CSI Driver add-on."
   type        = string
 }
