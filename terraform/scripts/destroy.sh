@@ -12,7 +12,7 @@ trap 'echo ""; echo "ERROR: Cleanup failed on line $LINENO"; exit 1' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-cd "$PROJECT_ROOT/terraform"
+cd "$PROJECT_ROOT"
 
 export AWS_PAGER=""
 
