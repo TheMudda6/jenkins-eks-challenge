@@ -29,3 +29,22 @@ tfplan
 destroy.tfplan
 crash.log
 .terraform.tfstate.lock.info
+
+# Debug
+
+debug/
+
+# Logs
+
+*.log
+
+# Temporary files
+
+*.bak
+*.tmp
+
+# Windows
+
+Thumbs.db
+
+
