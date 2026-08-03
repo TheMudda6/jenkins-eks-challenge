@@ -1,10 +1,10 @@
 # Secrets for Postgres Database
 
-resource "kubernetes_secret" "postgres" {
+resource "kubernetes_secret_v1" "postgres" {
 
   metadata {
     name      = "postgres-secret"
-    namespace = "default"
+    namespace = var.namespace
   }
 
   data = {

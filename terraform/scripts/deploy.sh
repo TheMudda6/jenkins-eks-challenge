@@ -15,24 +15,6 @@ TERRAFORM_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$TERRAFORM_DIR"
 
 # --------------------------------------------------------------------
-# Local Environment Variables
-#
-# Purpose:
-# Load deployment secrets from the local .env file.
-# --------------------------------------------------------------------
-
-if [ -f .env ]; then
-    set -a
-    source .env
-    set +a
-else
-    echo "ERROR: .env file not found."
-    exit 1
-fi
-
-echo "✓ Local environment variables loaded."
-
-# --------------------------------------------------------------------
 # Deployment Configuration
 #
 # Purpose:
@@ -168,6 +150,20 @@ kubectl wait \
 echo "✓ Amazon EBS CSI Driver is ready."
 
 # --------------------------------------------------------------------
+# Kubernetes Namespace
+#
+# Purpose:
+# Create the namespace used by all application workloads.
+# --------------------------------------------------------------------
+
+print_banner "Creating Kubernetes Namespace"
+
+kubectl create namespace "$NAMESPACE" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "✓ Namespace created."
+
+# --------------------------------------------------------------------
 # Snapshot Infrastructure
 # --------------------------------------------------------------------
 
@@ -203,37 +199,100 @@ kubectl get storageclass
 echo "✓ Storage resources verified."
 
 # --------------------------------------------------------------------
+# PostgreSQL Deployment
+# --------------------------------------------------------------------
+
+# --------------------------------------------------------------------
 # PostgreSQL Secret
 #
 # Purpose:
-# Generate the PostgreSQL Secret from the local environment variables.
+# Verify the Secret created by Terraform exists before deploying
+# PostgreSQL.
 # --------------------------------------------------------------------
 
-print_banner "Generating PostgreSQL Secret"
+print_banner "Verifying PostgreSQL Secret"
 
-envsubst \
-    < k8s/postgres/postgres-secret.yaml.template \
-    > k8s/postgres/postgres-secret.yaml
+kubectl get secret postgres-secret \
+    -n "$NAMESPACE"
 
-echo "✓ PostgreSQL Secret generated."
+echo "✓ PostgreSQL Secret verified."
 
-if [ -f k8s/postgres/postgres-secret.yaml ]; then
-    echo "✓ PostgreSQL Secret generated successfully."
-else
-    echo "ERROR: PostgreSQL Secret was not generated."
-    exit 1
-fi
+print_banner "Deploying PostgreSQL"
+
+echo "Creating PostgreSQL Headless Service..."
+
+kubectl apply -f k8s/postgres/postgres-service.yaml
+
+echo "✓ PostgreSQL Service created."
+
+echo "Creating PostgreSQL StatefulSet..."
+
+kubectl apply -f k8s/postgres/postgres-statefulset.yaml
+
+echo "✓ PostgreSQL StatefulSet created."
+
+echo
+echo "Waiting for PostgreSQL StatefulSet rollout..."
+
+kubectl rollout status \
+    statefulset/postgres \
+    -n "$NAMESPACE" \
+    --timeout=300s
+
+echo "✓ PostgreSQL StatefulSet rollout complete."
+
+echo
+echo "Waiting for PostgreSQL Pod..."
+
+kubectl wait \
+    --for=condition=Ready \
+    pod/postgres-0 \
+    -n "$NAMESPACE" \
+    --timeout=300s
+
+echo "✓ PostgreSQL Pod is ready."
+
+echo
+echo "Waiting for PostgreSQL PVC..."
+
+kubectl wait \
+  --for=jsonpath='{.status.phase}'=Bound \
+  pvc/postgres-data-postgres-0 \
+  -n "$NAMESPACE" \
+  --timeout=120s
+
+echo "✓ PostgreSQL PVC is bound."
+
+echo
+echo "PostgreSQL resources:"
+
+echo
+echo "PostgreSQL Pods:"
+kubectl get pods -l app=postgres -n "$NAMESPACE"
+
+echo
+echo "PostgreSQL Service:"
+kubectl get svc postgres -n "$NAMESPACE"
+
+echo
+echo "PostgreSQL PVC:"
+kubectl get pvc -n "$NAMESPACE"
+
+echo
+echo "PostgreSQL Endpoints:"
+kubectl get endpoints postgres -n "$NAMESPACE"
+
+echo
+echo "PostgreSQL StatefulSet:"
+kubectl get statefulset postgres -n "$NAMESPACE"
+
+echo "✓ PostgreSQL verification complete."
 
 # --------------------------------------------------------------------
 # Jenkins Deployment
 # --------------------------------------------------------------------
 
 print_banner "Deploying Jenkins"
-
-kubectl create namespace "$NAMESPACE" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-echo "✓ Namespace created."
 
 kubectl apply -f k8s/jenkins/jenkins-pvc.yaml
 echo "✓ PVC created"
@@ -340,8 +399,28 @@ echo "EBS CSI Controller:"
 kubectl get deployment ebs-csi-controller -n kube-system
 
 echo
-echo "Jenkins:"
-kubectl get all -n "$NAMESPACE"
+echo "PostgreSQL StatefulSet:"
+kubectl get statefulset postgres -n "$NAMESPACE"
+
+echo
+echo "PostgreSQL Pods:"
+kubectl get pods -l app=postgres -n "$NAMESPACE"
+
+echo
+echo "PostgreSQL Service:"
+kubectl get svc postgres -n "$NAMESPACE"
+
+echo
+echo "PostgreSQL PVC:"
+kubectl get pvc -l app=postgres -n "$NAMESPACE"
+
+echo
+echo "Jenkins Deployment:"
+kubectl get deployment jenkins -n "$NAMESPACE"
+
+echo
+echo "Jenkins Pods:"
+kubectl get pods -l app=jenkins -n "$NAMESPACE"
 
 echo
 echo "Ingress:"

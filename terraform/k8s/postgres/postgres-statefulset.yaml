@@ -8,8 +8,9 @@
 apiVersion: apps/v1
 kind: StatefulSet
 
-# Instead, it allows each StatefulSet pod to be reached individually using
-# predictable DNS names.
+# -----------------------------------------------------------------------------
+# Uses the PostgreSQL Headless Service to provide each StatefulSet Pod
+# with a stable DNS name and network identity.
 # -----------------------------------------------------------------------------
 
 metadata:
@@ -31,5 +32,48 @@ spec:
 
     spec:
       containers:
+
         - name: postgres
-          image: postgres:16
+          image: postgres:16.9
+          ports:
+            - containerPort: 5432
+              name: postgres
+
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+
+  volumeClaimTemplates:
+
+    - metadata:
+        name: postgres-data
+
+      spec:
+
+        accessModes:
+          - ReadWriteOnce
+
+        storageClassName: gp3-retain
+
+        resources:
+          requests:
+            storage: 20Gi    

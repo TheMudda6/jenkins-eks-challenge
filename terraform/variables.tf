@@ -272,3 +272,8 @@ variable "postgres_password" {
   type        = string
   sensitive   = true
 }
+
+variable "namespace" {
+  description = "Kubernetes namespace for application workloads."
+  type        = string
+}
