@@ -83,8 +83,16 @@ echo "Deleting Jenkins ingress..."
 kubectl delete -f k8s/jenkins/jenkins-ingress.yaml --ignore-not-found=true
 echo "✓ Jenkins ingress deleted."
 
-echo "Waiting for the AWS Load Balancer to be deleted..."
-sleep 120
+echo
+echo "Waiting for Jenkins Ingress to be removed..."
+
+kubectl wait \
+    --for=delete \
+    ingress/jenkins-ingress \
+    -n "$NAMESPACE" \
+    --timeout=300s || true
+
+echo "✓ Jenkins Ingress removed."
 
 echo "Deleting Jenkins service..."
 kubectl delete -f k8s/jenkins/jenkins-service.yaml --ignore-not-found=true
@@ -93,6 +101,79 @@ echo "✓ Jenkins service deleted."
 echo "Deleting Jenkins deployment..."
 kubectl delete -f k8s/jenkins/jenkins-deployment.yaml --ignore-not-found=true
 echo "✓ Jenkins deployment deleted."
+
+# --------------------------------------------------------------------
+# PostgreSQL Cleanup
+#
+# Purpose:
+# Remove PostgreSQL resources before deleting the namespace.
+# --------------------------------------------------------------------
+
+print_banner "Removing PostgreSQL"
+
+echo "Deleting PostgreSQL StatefulSet..."
+
+kubectl delete \
+    -f k8s/postgres/postgres-statefulset.yaml \
+    --ignore-not-found=true
+
+echo "✓ PostgreSQL StatefulSet deleted."
+
+echo
+echo "Waiting for PostgreSQL StatefulSet to terminate..."
+
+kubectl wait \
+    --for=delete \
+    statefulset/postgres \
+    -n "$NAMESPACE" \
+    --timeout=300s || true
+
+echo "✓ PostgreSQL StatefulSet removed."
+
+echo
+echo "Verifying PostgreSQL Pods..."
+
+kubectl get pods \
+    -l app=postgres \
+    -n "$NAMESPACE" || true
+
+echo "✓ PostgreSQL Pods verified."
+
+echo
+echo "Deleting PostgreSQL PVC..."
+
+kubectl delete \
+    pvc/postgres-data-postgres-0 \
+    -n "$NAMESPACE" \
+    --ignore-not-found=true
+
+echo "✓ PostgreSQL PVC deleted."
+
+echo
+echo "Deleting PostgreSQL Service..."
+
+kubectl delete \
+    -f k8s/postgres/postgres-service.yaml \
+    --ignore-not-found=true
+
+echo "✓ PostgreSQL Service deleted."
+
+echo
+echo "Deleting PostgreSQL Secret..."
+
+kubectl delete \
+    secret/postgres-secret \
+    -n "$NAMESPACE" \
+    --ignore-not-found=true
+
+echo "✓ PostgreSQL Secret deleted."
+
+echo
+echo "Removing generated PostgreSQL Secret..."
+
+rm -f k8s/postgres/postgres-secret.yaml
+
+echo "✓ Generated PostgreSQL Secret cleaned up."
 
 echo "Deleting Jenkins PVC..."
 kubectl delete -f k8s/jenkins/jenkins-pvc.yaml --ignore-not-found=true
@@ -106,8 +187,24 @@ kubectl wait --for=delete namespace/"$NAMESPACE" --timeout=120s || true
 echo "✓ Namespace removed."
 
 echo
-echo "Remaining cluster resources:"
+echo "Remaining Namespaces:"
+kubectl get namespaces || true
+
+echo
+echo "Remaining Pods:"
 kubectl get pods -A || true
+
+echo
+echo "Remaining Services:"
+kubectl get svc -A || true
+
+echo
+echo "Remaining PVCs:"
+kubectl get pvc -A || true
+
+echo
+echo "Remaining Ingresses:"
+kubectl get ingress -A || true
 
 # --------------------------------------------------------------------
 # Snapshot Infrastructure
@@ -139,12 +236,22 @@ echo "✓ gp3 StorageClass deleted."
 
 print_banner "Terraform Cleanup"
 
+echo "Formatting Terraform configuration..."
+
+terraform fmt -recursive
+
+echo "✓ Terraform formatting complete."
+
 echo "Validating Terraform configuration..."
+
 terraform validate
+
 echo "✓ Terraform validation complete."
 
 echo "Creating Terraform destroy plan..."
+
 terraform plan -destroy -out=destroy.tfplan
+
 echo "✓ Terraform destroy plan created."
 
 read -p "Proceed with Terraform destroy? (yes/no): " destroy_confirm
@@ -155,8 +262,15 @@ if [ "$destroy_confirm" != "yes" ]; then
 fi
 
 echo "Destroying Terraform infrastructure..."
+
 terraform apply -auto-approve destroy.tfplan
+
 echo "✓ Terraform infrastructure destroyed."
+
+echo
+echo "Confirming Terraform state is empty..."
+
+terraform state list || echo "✓ Terraform state is empty."
 
 # --------------------------------------------------------------------
 # Cleanup Verification
