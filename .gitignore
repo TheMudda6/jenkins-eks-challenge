@@ -1,4 +1,4 @@
-
+#
 # ----------------------------
 # VS Code
 # ----------------------------
@@ -29,6 +29,7 @@ tfplan
 destroy.tfplan
 crash.log
 .terraform.tfstate.lock.info
+k8s/postgres/postgres-secret.yaml
 
 # Debug
 
@@ -47,4 +48,17 @@ debug/
 
 Thumbs.db
 
+# --------------------------------------------------------------------
+# Generated Kubernetes Secrets
+#
+# Purpose:
+# Ignore Secrets generated during deployment.
+# --------------------------------------------------------------------
 
+terraform/k8s/postgres/postgres-secret.yaml
+terraform/k8s/redis/redis-secret.yaml
+
+# Local deployment configuration
+terraform/.env
+
+.env
