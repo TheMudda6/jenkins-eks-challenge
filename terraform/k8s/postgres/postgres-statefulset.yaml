@@ -1,0 +1,35 @@
+# -----------------------------------------------------------------------------
+# PostgreSQL StatefulSet
+#
+# Purpose:
+# Manages a set of identical pods with stable network identities and persistent storage.
+# -----------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: StatefulSet
+
+# Instead, it allows each StatefulSet pod to be reached individually using
+# predictable DNS names.
+# -----------------------------------------------------------------------------
+
+metadata:
+  name: postgres
+  namespace: jenkins
+
+spec:
+  serviceName: postgres
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: postgres
+
+  template:
+    metadata:
+      labels:
+        app: postgres
+
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16

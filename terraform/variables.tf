@@ -249,3 +249,26 @@ variable "max_size" {
   type        = number
   default     = 2
 }
+
+# --------------------------------------------------------------------
+# PostgreSQL
+#
+# Purpose:
+# Configuration used to create the PostgreSQL Kubernetes Secret.
+# --------------------------------------------------------------------
+
+variable "postgres_db" {
+  description = "PostgreSQL database name."
+  type        = string
+}
+
+variable "postgres_user" {
+  description = "PostgreSQL username."
+  type        = string
+}
+
+variable "postgres_password" {
+  description = "PostgreSQL password."
+  type        = string
+  sensitive   = true
+}

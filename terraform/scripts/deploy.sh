@@ -15,6 +15,24 @@ TERRAFORM_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$TERRAFORM_DIR"
 
 # --------------------------------------------------------------------
+# Local Environment Variables
+#
+# Purpose:
+# Load deployment secrets from the local .env file.
+# --------------------------------------------------------------------
+
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+else
+    echo "ERROR: .env file not found."
+    exit 1
+fi
+
+echo "✓ Local environment variables loaded."
+
+# --------------------------------------------------------------------
 # Deployment Configuration
 #
 # Purpose:
@@ -183,6 +201,28 @@ echo "Current StorageClasses:"
 kubectl get storageclass
 
 echo "✓ Storage resources verified."
+
+# --------------------------------------------------------------------
+# PostgreSQL Secret
+#
+# Purpose:
+# Generate the PostgreSQL Secret from the local environment variables.
+# --------------------------------------------------------------------
+
+print_banner "Generating PostgreSQL Secret"
+
+envsubst \
+    < k8s/postgres/postgres-secret.yaml.template \
+    > k8s/postgres/postgres-secret.yaml
+
+echo "✓ PostgreSQL Secret generated."
+
+if [ -f k8s/postgres/postgres-secret.yaml ]; then
+    echo "✓ PostgreSQL Secret generated successfully."
+else
+    echo "ERROR: PostgreSQL Secret was not generated."
+    exit 1
+fi
 
 # --------------------------------------------------------------------
 # Jenkins Deployment

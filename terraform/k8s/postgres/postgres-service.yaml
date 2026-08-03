@@ -1,0 +1,32 @@
+# -----------------------------------------------------------------------------
+# PostgreSQL Headless Service
+#
+# Purpose:
+# Provides stable network identities for PostgreSQL StatefulSet pods.
+#
+# Unlike a normal Service, a headless Service does not load balance traffic.
+# Instead, it allows each StatefulSet pod to be reached individually using
+# predictable DNS names.
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: postgres
+  namespace: jenkins
+
+spec:
+
+  # Setting clusterIP to None creates a headless Service.
+  # This allows StatefulSet pods to have stable DNS records.
+
+  clusterIP: None
+
+  selector:
+    app: postgres
+
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
