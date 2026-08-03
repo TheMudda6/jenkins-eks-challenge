@@ -80,22 +80,22 @@ kubectl get nodes
 echo "✓ Cluster connectivity verified."
 
 echo "Deleting Jenkins ingress..."
-kubectl delete -f k8s/jenkins-ingress.yaml --ignore-not-found=true
+kubectl delete -f k8s/jenkins/jenkins-ingress.yaml --ignore-not-found=true
 echo "✓ Jenkins ingress deleted."
 
 echo "Waiting for the AWS Load Balancer to be deleted..."
 sleep 120
 
 echo "Deleting Jenkins service..."
-kubectl delete -f k8s/jenkins-service.yaml --ignore-not-found=true
+kubectl delete -f k8s/jenkins/jenkins-service.yaml --ignore-not-found=true
 echo "✓ Jenkins service deleted."
 
 echo "Deleting Jenkins deployment..."
-kubectl delete -f k8s/jenkins-deployment.yaml --ignore-not-found=true
+kubectl delete -f k8s/jenkins/jenkins-deployment.yaml --ignore-not-found=true
 echo "✓ Jenkins deployment deleted."
 
 echo "Deleting Jenkins PVC..."
-kubectl delete -f k8s/jenkins-pvc.yaml --ignore-not-found=true
+kubectl delete -f k8s/jenkins/jenkins-pvc.yaml --ignore-not-found=true
 echo "✓ Jenkins PVC deleted."
 
 echo "Deleting Jenkins namespace..."

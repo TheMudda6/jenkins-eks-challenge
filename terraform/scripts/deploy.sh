@@ -195,13 +195,13 @@ kubectl create namespace "$NAMESPACE" \
 
 echo "✓ Namespace created."
 
-kubectl apply -f k8s/jenkins-pvc.yaml
+kubectl apply -f k8s/jenkins/jenkins-pvc.yaml
 echo "✓ PVC created"
 
-kubectl apply -f k8s/jenkins-deployment.yaml
+kubectl apply -f k8s/jenkins/jenkins-deployment.yaml
 echo "✓ Deployment created"
 
-kubectl apply -f k8s/jenkins-service.yaml
+kubectl apply -f k8s/jenkins/jenkins-service.yaml
 echo "✓ Service created"
 
 echo
@@ -253,7 +253,7 @@ echo "✓ Service endpoints verified"
 
 print_banner "Creating Ingress"
 
-kubectl apply -f k8s/jenkins-ingress.yaml
+kubectl apply -f k8s/jenkins/jenkins-ingress.yaml
 
 echo "✓ Waiting for Ingress to be created and assigned a hostname..."
 
