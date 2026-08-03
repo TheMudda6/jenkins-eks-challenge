@@ -206,11 +206,31 @@ echo "✓ Storage resources verified."
 # PostgreSQL Secret
 #
 # Purpose:
-# Verify the Secret created by Terraform exists before deploying
-# PostgreSQL.
+# Generate the PostgreSQL Secret from the local template and apply it
+# to the Kubernetes cluster.
 # --------------------------------------------------------------------
 
-print_banner "Verifying PostgreSQL Secret"
+print_banner "Generating PostgreSQL Secret"
+
+set -a
+source .env
+set +a
+
+envsubst \
+    < k8s/postgres/postgres-secret.yaml.template \
+    > k8s/postgres/postgres-secret.yaml
+
+    if [ ! -f k8s/postgres/postgres-secret.yaml ]; then
+    echo "ERROR: Failed to generate PostgreSQL Secret."
+    exit 1
+fi
+
+echo "✓ PostgreSQL Secret generated."
+
+kubectl apply \
+    -f k8s/postgres/postgres-secret.yaml
+
+echo "✓ PostgreSQL Secret applied."
 
 kubectl get secret postgres-secret \
     -n "$NAMESPACE"
