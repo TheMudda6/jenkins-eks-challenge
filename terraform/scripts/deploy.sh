@@ -220,7 +220,7 @@ envsubst \
     < k8s/postgres/postgres-secret.yaml.template \
     > k8s/postgres/postgres-secret.yaml
 
-    if [ ! -f k8s/postgres/postgres-secret.yaml ]; then
+if [ ! -f k8s/postgres/postgres-secret.yaml ]; then
     echo "ERROR: Failed to generate PostgreSQL Secret."
     exit 1
 fi
