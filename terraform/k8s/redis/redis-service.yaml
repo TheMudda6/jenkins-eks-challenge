@@ -1,0 +1,25 @@
+# -----------------------------------------------------------------------------
+# Redis Service
+#
+# Purpose:
+# Provides stable network access to the Redis Deployment
+# from within the Kubernetes cluster.
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: redis
+  namespace: jenkins
+
+spec:
+  selector:
+    app: redis
+
+  ports:
+    - port: 6379
+      targetPort: redis
+      protocol: TCP
+
+  type: ClusterIP

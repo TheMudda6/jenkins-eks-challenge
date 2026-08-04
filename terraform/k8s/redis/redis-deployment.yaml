@@ -1,0 +1,36 @@
+# -----------------------------------------------------------------------------
+# Redis Deployment
+#
+# Purpose:
+# Deploys a single Redis Pod to provide fast in-memory caching
+# for the application.
+# -----------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: redis
+  namespace: jenkins
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: redis
+
+  template:
+    metadata:
+      labels:
+        app: redis
+
+    spec:
+      containers:
+
+        - name: redis
+          image: redis:8.2
+
+          ports:
+            - containerPort: 6379
+              name: redis

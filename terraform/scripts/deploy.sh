@@ -309,6 +309,64 @@ kubectl get statefulset postgres -n "$NAMESPACE"
 echo "✓ PostgreSQL verification complete."
 
 # --------------------------------------------------------------------
+# Redis Deployment
+# --------------------------------------------------------------------
+
+print_banner "Deploying Redis"
+
+echo "Creating Redis Service..."
+
+kubectl apply -f k8s/redis/redis-service.yaml
+
+echo "✓ Redis Service created."
+
+echo "Creating Redis Deployment..."
+
+kubectl apply -f k8s/redis/redis-deployment.yaml
+
+echo "✓ Redis Deployment created."
+
+echo
+echo "Waiting for Redis Deployment rollout..."
+
+kubectl rollout status \
+    deployment/redis \
+    -n "$NAMESPACE" \
+    --timeout=300s
+
+echo "✓ Redis Deployment rollout complete."
+
+echo
+echo "Waiting for Redis Pod..."
+
+kubectl wait \
+    --for=condition=Ready \
+    pod \
+    -l app=redis \
+    -n "$NAMESPACE" \
+    --timeout=300s
+
+echo "✓ Redis Pod is ready."
+
+echo
+echo "Redis resources:"
+
+echo
+echo "Redis Pods:"
+kubectl get pods -l app=redis -n "$NAMESPACE"
+
+echo
+echo "Redis Service:"
+kubectl get svc redis -n "$NAMESPACE"
+
+echo
+echo "Redis Endpoints:"
+kubectl get endpoints redis -n "$NAMESPACE"
+
+echo
+echo "✓ Redis verification complete."
+
+# --------------------------------------------------------------------
 # Jenkins Deployment
 # --------------------------------------------------------------------
 
@@ -433,6 +491,18 @@ kubectl get svc postgres -n "$NAMESPACE"
 echo
 echo "PostgreSQL PVC:"
 kubectl get pvc -l app=postgres -n "$NAMESPACE"
+
+echo
+echo "Redis Deployment:"
+kubectl get deployment redis -n "$NAMESPACE"
+
+echo
+echo "Redis Pods:"
+kubectl get pods -l app=redis -n "$NAMESPACE"
+
+echo
+echo "Redis Service:"
+kubectl get svc redis -n "$NAMESPACE"
 
 echo
 echo "Jenkins Deployment:"
