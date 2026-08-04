@@ -79,6 +79,36 @@ kubectl get nodes
 
 echo "✓ Cluster connectivity verified."
 
+# --------------------------------------------------------------------
+# ALB Verification
+#
+# Purpose:
+# Retrieve the AWS Load Balancer hostname before removing the Ingress.
+# --------------------------------------------------------------------
+
+echo
+echo "Retrieving ALB hostname..."
+
+ALB_HOSTNAME=$(kubectl get ingress jenkins-ingress \
+    -n "$NAMESPACE" \
+    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+
+if [ -z "$ALB_HOSTNAME" ]; then
+    echo "No ALB hostname found."
+else
+    echo "✓ ALB Hostname:"
+    echo "$ALB_HOSTNAME"
+
+    echo
+    echo "Verifying ALB DNS..."
+
+    nslookup "$ALB_HOSTNAME" >/dev/null
+
+    echo "✓ ALB hostname resolves."
+fi
+
+
+
 echo "Deleting Jenkins ingress..."
 kubectl delete -f k8s/jenkins/jenkins-ingress.yaml --ignore-not-found=true
 echo "✓ Jenkins ingress deleted."

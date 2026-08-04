@@ -442,6 +442,36 @@ kubectl wait \
 
 echo "✓ Ingress created and hostname assigned"
 
+# --------------------------------------------------------------------
+# Cloudflare DNS
+#
+# Purpose:
+# Retrieve the AWS Load Balancer hostname assigned to the Ingress.
+# --------------------------------------------------------------------
+
+echo
+echo "Retrieving ALB hostname..."
+
+ALB_HOSTNAME=$(kubectl get ingress jenkins-ingress \
+    -n "$NAMESPACE" \
+    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+    
+if [ -z "$ALB_HOSTNAME" ]; then
+    echo
+    echo "ERROR: Failed to retrieve the ALB hostname."
+    exit 1
+fi
+
+echo "✓ ALB Hostname:"
+echo "$ALB_HOSTNAME"
+
+echo
+echo "Verifying ALB DNS..."
+
+nslookup "$ALB_HOSTNAME" >/dev/null
+
+echo "✓ ALB hostname resolves."
+
 echo
 echo "Ingress status:"
 kubectl get ingress -n "$NAMESPACE"
