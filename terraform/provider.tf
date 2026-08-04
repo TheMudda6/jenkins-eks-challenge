@@ -12,11 +12,11 @@ terraform {
       version = "~> 2.13"
     }
 
-      cloudflare = {
-    source  = "cloudflare/cloudflare"
-    version = "~> 5.22"
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.22"
+    }
   }
-}
 }
 
 provider "helm" {
