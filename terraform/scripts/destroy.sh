@@ -175,6 +175,58 @@ rm -f k8s/postgres/postgres-secret.yaml
 
 echo "✓ Generated PostgreSQL Secret cleaned up."
 
+# --------------------------------------------------------------------
+# Redis Cleanup
+#
+# Purpose:
+# Remove Redis resources before deleting the namespace.
+# --------------------------------------------------------------------
+
+print_banner "Removing Redis"
+
+echo "Deleting Redis Deployment..."
+
+kubectl delete \
+    -f k8s/redis/redis-deployment.yaml \
+    --ignore-not-found=true
+
+echo "✓ Redis Deployment deleted."
+
+echo
+echo "Waiting for Redis Deployment to terminate..."
+
+kubectl wait \
+    --for=delete \
+    deployment/redis \
+    -n "$NAMESPACE" \
+    --timeout=300s || true
+
+echo "✓ Redis Deployment removed."
+
+echo
+echo "Deleting Redis Service..."
+
+kubectl delete \
+    -f k8s/redis/redis-service.yaml \
+    --ignore-not-found=true
+
+echo "✓ Redis Service deleted."
+
+echo
+echo "Redis resources:"
+
+echo
+echo "Redis Pods:"
+kubectl get pods -l app=redis -n "$NAMESPACE" || true
+
+echo
+echo "Redis Service:"
+kubectl get svc redis -n "$NAMESPACE" || true
+
+echo
+
+echo "✓ Redis cleanup complete."
+
 echo "Deleting Jenkins PVC..."
 kubectl delete -f k8s/jenkins/jenkins-pvc.yaml --ignore-not-found=true
 echo "✓ Jenkins PVC deleted."
