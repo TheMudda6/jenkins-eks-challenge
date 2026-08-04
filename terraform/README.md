@@ -22,10 +22,13 @@ The platform currently includes:
 - Amazon EBS CSI Driver
 - AWS Load Balancer Controller
 - Volume Snapshot support
-- Persistent Jenkins storage
-- HTTPS via ACM
-- Cloudflare DNS
-- Automated deployment and destruction scripts
+- Jenkins Deployment
+- PostgreSQL StatefulSet
+- Redis Deployment
+- Persistent GP3 storage
+- HTTPS using AWS Certificate Manager (ACM)
+- Cloudflare-managed DNS
+- Automated deployment, validation and destruction scripts
 
 ## Features
 
@@ -34,15 +37,19 @@ The platform currently includes:
 - Managed worker node groups
 - Secure IAM Roles for Service Accounts (IRSA)
 - Amazon EBS CSI Driver
-- Dynamic GP3 persistent volumes
-- Volume Snapshot support
+- Dynamic GP3 StorageClasses
+- Persistent Jenkins storage
+- PostgreSQL StatefulSet with retained persistent storage
+- Redis Deployment for application caching
+- Kubernetes Volume Snapshot support
 - AWS Load Balancer Controller
-- HTTPS using AWS Certificate Manager
-- Cloudflare DNS integration
+- HTTPS using AWS Certificate Manager (ACM)
+- Cloudflare-managed DNS
 - One-command deployment
 - One-command destruction
 - Infrastructure validation
 - Automated deployment verification
+- Automated cleanup verification
 
 ## Technology Stack
 
@@ -120,20 +127,31 @@ infrastructure while Kubernetes manages the application workloads.
                      ▼
             Kubernetes Ingress
                      │
-                     ▼
-            Jenkins Service (NodePort)
+          ┌──────────┴──────────┐
+          ▼                     ▼
+   Jenkins Service        PostgreSQL Service
+          │                     │
+          ▼                     ▼
+  Jenkins Deployment     PostgreSQL StatefulSet
+          │                     │
+          ▼                     ▼
+     Jenkins Pod          PostgreSQL Pod
+          │                     │
+          ▼                     ▼
+     Jenkins PVC        PostgreSQL PVC (Retain)
+          │                     │
+          ▼                     ▼
+     Amazon EBS          Amazon EBS
+
+                     ▲
+                     │
+             Redis Service
                      │
                      ▼
-              Jenkins Deployment
+             Redis Deployment
                      │
                      ▼
-                Jenkins Pod
-                     │
-                     ▼
-        Persistent Volume Claim (PVC)
-                     │
-                     ▼
-             Amazon EBS Volume (GP3)
+                Redis Pod
 
 ────────────────────────────────────────────
 
@@ -196,13 +214,16 @@ Install Snapshot Infrastructure
 Create Storage Classes
       │
       ▼
+Deploy PostgreSQL
+      │
+      ▼
+Deploy Redis
+      │
+      ▼
 Deploy Jenkins
       │
       ▼
 Create Ingress
-      │
-      ▼
-Deployment Verification
 ```
 
 ## Deployment
@@ -228,14 +249,16 @@ cd terraform
 
 The deployment script automatically:
 
-- Validates the Terraform configuration
+- Formats and validates the Terraform configuration
 - Creates and reviews a Terraform execution plan
 - Provisions AWS infrastructure
 - Configures kubectl
 - Installs the EBS CSI Driver
 - Installs the AWS Load Balancer Controller
 - Installs Volume Snapshot infrastructure
-- Creates StorageClasses
+- Creates GP3 StorageClasses
+- Deploys PostgreSQL
+- Deploys Redis
 - Deploys Jenkins
 - Creates the Application Load Balancer
 - Verifies the deployment
@@ -258,15 +281,20 @@ The destroy script safely removes Kubernetes resources before destroying all Ter
 | IAM & IRSA | ✅ Complete |
 | Amazon EKS | ✅ Complete |
 | Storage | ✅ Complete |
+| PostgreSQL | ✅ Complete |
+| Redis | ✅ Complete |
 | Volume Snapshots | ✅ Complete |
 | Jenkins Platform | ✅ Complete |
 | Deploy & Destroy Automation | ✅ Complete |
-| HTTPS & Cloudflare | ✅ Complete |
-| PostgreSQL | ⏳ Planned (Phase 2) |
-| Redis | ⏳ Planned (Phase 2) |
-| Sample Application | ⏳ Planned (Phase 2) |
-| ArgoCD | ⏳ Planned (Phase 3) |
-| Prometheus & Grafana | ⏳ Planned (Phase 3) |
+| HTTPS & Cloudflare | ✅ Complete* |
+| Platform Validation | ✅ Complete |
+| Sample Application | ⏳ Phase 2 |
+| Amazon SQS | ⏳ Phase 2 |
+| Application CI/CD | ⏳ Phase 2 |
+| ArgoCD | ⏳ Phase 3 |
+| Prometheus & Grafana | ⏳ Phase 3 |
+
+> **Note:** Cloudflare DNS is currently managed manually. Automating DNS management with Terraform is planned as a future enhancement.
 
 ## Roadmap
 
@@ -288,11 +316,12 @@ The destroy script safely removes Kubernetes resources before destroying all Ter
 
 ### Phase 2
 
-- PostgreSQL StatefulSet
-- Redis StatefulSet
-- Sample microservice application
-- Amazon SQS integration
+- Deploy sample microservice application
+- Connect application to PostgreSQL
+- Integrate Redis caching
+- Amazon SQS event bus
 - Application CI/CD
+- Automate Cloudflare DNS with Terraform
 
 ### Phase 3
 
@@ -304,15 +333,17 @@ The destroy script safely removes Kubernetes resources before destroying all Ter
 
 ## Screenshots
 
-> Screenshots will be added after the final v1.0 deployment.
+### Successful Deployment
 
-- Architecture
-- AWS Console
-- EKS Cluster
-- Jenkins Dashboard
-- Storage
-- Deploy Script
-- Destroy Script
+![Deployment](screenshots/deploy-successful.png)
+
+### Platform Verification
+
+![Platform Verification](screenshots/services.png)
+
+### Successful Cleanup
+
+![Cleanup](screenshots/destroy-successful.png)
 
 ## Lessons Learned
 
@@ -324,6 +355,7 @@ This project reinforced several important DevOps engineering principles:
 - Every deployment should include validation before and after infrastructure changes.
 - Automated cleanup is just as important as automated deployment for controlling cloud costs.
 - Building, breaking, debugging and rebuilding infrastructure provides a deeper understanding than following tutorials.
+- Separating infrastructure provisioning (Terraform) from workload deployment (Kubernetes manifests and deployment scripts) results in a cleaner, more maintainable platform.
 
 ## License
 
