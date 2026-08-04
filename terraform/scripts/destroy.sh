@@ -102,9 +102,12 @@ else
     echo
     echo "Verifying ALB DNS..."
 
-    nslookup "$ALB_HOSTNAME" >/dev/null
-
+if nslookup "$ALB_HOSTNAME" >/dev/null 2>&1; then
     echo "✓ ALB hostname resolves."
+else
+    echo "WARNING: ALB hostname is not yet resolvable."
+    echo "DNS propagation may still be in progress."
+fi
 fi
 
 
