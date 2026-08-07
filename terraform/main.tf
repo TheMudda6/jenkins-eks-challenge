@@ -99,3 +99,18 @@ module "eks" {
 
   ebs_csi_driver_role_arn = module.iam.ebs_csi_driver_role_arn
 }
+
+# -----------------------------------------------------------------------------
+# SQS Module
+#
+# Purpose:
+# Creates the Amazon SQS queues used for asynchronous communication between
+# application services.
+# -----------------------------------------------------------------------------
+
+module "sqs" {
+  source = "./modules/sqs"
+
+  project_name = var.project_name
+  environment  = var.environment
+}
