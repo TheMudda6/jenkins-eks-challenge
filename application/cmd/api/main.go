@@ -27,6 +27,7 @@ func main() {
 
     http.HandleFunc("/", handlers.Home)
     http.HandleFunc("/health", handlers.Health)
+    http.HandleFunc("/orders", handlers.Orders(db))
 
     fmt.Println("Server starting on", cfg.Port)
 

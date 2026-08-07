@@ -5,6 +5,7 @@ import (
     "fmt"
 
     "github.com/TheMudda6/jenkins-eks-challenge/application/internal/config"
+	"github.com/TheMudda6/jenkins-eks-challenge/application/internal/models"
 
     _ "github.com/lib/pq"
 )
@@ -57,4 +58,62 @@ func CreateOrdersTable(db *sql.DB) error {
 	fmt.Println("Orders table is ready.")
 
 	return nil
+}
+
+func CreateOrder(db *sql.DB, order models.Order) error {
+
+	query := `
+	INSERT INTO orders (customer_name, product_name, quantity)
+	VALUES ($1, $2, $3)
+	`
+
+	_, err := db.Exec(
+		query,
+		order.CustomerName,
+		order.ProductName,
+		order.Quantity,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetOrders(db *sql.DB) ([]models.Order, error) {
+
+	rows, err := db.Query(`
+		SELECT id, customer_name, product_name, quantity
+		FROM orders
+		ORDER BY id;
+	`)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var orders []models.Order
+
+	for rows.Next() {
+
+		var order models.Order
+
+		err := rows.Scan(
+			&order.ID,
+			&order.CustomerName,
+			&order.ProductName,
+			&order.Quantity,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		orders = append(orders, order)
+	}
+
+	return orders, nil
 }
