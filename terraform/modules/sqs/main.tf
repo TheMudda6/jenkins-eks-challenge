@@ -21,14 +21,14 @@ resource "aws_sqs_queue" "orders" {
 
   receive_wait_time_seconds = 20
 
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.orders_dlq.arn
+    maxReceiveCount     = 5
+  })
+
   tags = {
     Name        = "${var.project_name}-${var.environment}-orders"
     Environment = var.environment
     Project     = var.project_name
-
-    redrive_policy = jsonencode({
-      deadLetterTargetArn = aws_sqs_queue.orders_dlq.arn
-      maxReceiveCount     = 5
-    })
   }
 }
