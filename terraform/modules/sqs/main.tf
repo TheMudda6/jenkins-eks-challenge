@@ -1,3 +1,16 @@
+resource "aws_sqs_queue" "orders_dlq" {
+
+  name = "${var.project_name}-${var.environment}-orders-dlq"
+
+  message_retention_seconds = 1209600
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-orders-dlq"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
 resource "aws_sqs_queue" "orders" {
 
   name = "${var.project_name}-${var.environment}-orders"
@@ -12,5 +25,10 @@ resource "aws_sqs_queue" "orders" {
     Name        = "${var.project_name}-${var.environment}-orders"
     Environment = var.environment
     Project     = var.project_name
+
+    redrive_policy = jsonencode({
+      deadLetterTargetArn = aws_sqs_queue.orders_dlq.arn
+      maxReceiveCount     = 5
+    })
   }
 }
