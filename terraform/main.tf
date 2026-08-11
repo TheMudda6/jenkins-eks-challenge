@@ -134,3 +134,19 @@ output "queue_name" {
   value       = module.sqs.queue_name
 }
 
+module "ecr" {
+  source = "./modules/ecr"
+
+  project_name = var.project_name
+  environment  = var.environment
+}
+
+output "repository_url" {
+  description = "Application ECR repository URL"
+  value       = module.ecr.repository_url
+}
+
+output "repository_name" {
+  description = "Application ECR repository name"
+  value       = module.ecr.repository_name
+}

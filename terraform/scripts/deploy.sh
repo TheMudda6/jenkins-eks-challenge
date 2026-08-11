@@ -143,6 +143,24 @@ fi
 
 echo "✓ Queue name retrieved."
 
+REPOSITORY_URL=$(terraform output -raw repository_url)
+
+if [ -z "$REPOSITORY_URL" ]; then
+    echo "ERROR: Failed to retrieve ECR Repository URL."
+    exit 1
+fi
+
+echo "✓ Repository URL retrieved."
+
+REPOSITORY_NAME=$(terraform output -raw repository_name)
+
+if [ -z "$REPOSITORY_NAME" ]; then
+    echo "ERROR: Failed to retrieve ECR Repository Name."
+    exit 1
+fi
+
+echo "✓ Repository name retrieved."
+
 # --------------------------------------------------------------------
 # Kubernetes Configuration
 # --------------------------------------------------------------------
