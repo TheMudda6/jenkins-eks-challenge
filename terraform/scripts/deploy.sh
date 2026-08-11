@@ -11,6 +11,7 @@ trap 'echo ""; echo "ERROR: Deployment failed on line $LINENO"; exit 1' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(dirname "$TERRAFORM_DIR")"
 
 cd "$TERRAFORM_DIR"
 
@@ -51,6 +52,11 @@ command -v terraform >/dev/null || { echo "ERROR: Terraform is not installed."; 
 command -v aws >/dev/null || { echo "ERROR: AWS CLI is not installed."; exit 1; }
 command -v kubectl >/dev/null || { echo "ERROR: kubectl is not installed."; exit 1; }
 command -v helm >/dev/null || { echo "ERROR: Helm is not installed."; exit 1; }
+
+command -v docker >/dev/null || {
+    echo "ERROR: Docker is not installed."
+    exit 1
+}
 
 echo "✓ All prerequisites found."
 
@@ -160,6 +166,63 @@ if [ -z "$REPOSITORY_NAME" ]; then
 fi
 
 echo "✓ Repository name retrieved."
+
+REGISTRY_URL="${REPOSITORY_URL%%/*}"
+
+if [ -z "$REGISTRY_URL" ]; then
+    echo "ERROR: Failed to determine ECR registry URL."
+    exit 1
+fi
+
+echo "✓ ECR registry URL determined."
+
+# --------------------------------------------------------------------
+# Docker Authentication
+#
+# Purpose:
+# Authenticate Docker with Amazon ECR.
+# --------------------------------------------------------------------
+
+print_banner "Docker Authentication"
+
+echo "Logging into Amazon ECR..."
+
+aws ecr get-login-password \
+| docker login \
+    --username AWS \
+    --password-stdin "$REGISTRY_URL"
+
+echo "✓ Docker authenticated with Amazon ECR."
+
+# --------------------------------------------------------------------
+# Docker Build
+#
+# Purpose:
+# Build the Go application container image.
+# --------------------------------------------------------------------
+
+print_banner "Building Application Image"
+
+echo "Changing to repository root..."
+
+cd "$REPO_ROOT"
+
+echo "✓ Repository root located."
+
+echo "Building Docker image..."
+
+docker build \
+    -t application:latest \
+    -f application/Dockerfile \
+    application
+
+echo "✓ Docker image built successfully."
+
+echo "Returning to Terraform directory..."
+
+cd "$TERRAFORM_DIR"
+
+echo "✓ Returned to Terraform directory."
 
 # --------------------------------------------------------------------
 # Kubernetes Configuration
