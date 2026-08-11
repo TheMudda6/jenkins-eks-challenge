@@ -9,9 +9,20 @@ type Config struct {
 	DatabaseUser string
 	DatabasePass string
 	DatabaseName string
+
+	AWSRegion string
+	QueueURL  string
 }
 
 func Load() Config {
+
+	awsRegion := os.Getenv("AWS_REGION")
+
+	if awsRegion == "" {
+		awsRegion = "eu-west-2"
+	}
+
+	queueURL := os.Getenv("QUEUE_URL")
 
 	port := os.Getenv("PORT")
 
@@ -21,40 +32,43 @@ func Load() Config {
 
 	dbHost := os.Getenv("DB_HOST")
 
-if dbHost == "" {
-    dbHost = "localhost"
-}
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
 
-dbPort := os.Getenv("DB_PORT")
+	dbPort := os.Getenv("DB_PORT")
 
-if dbPort == "" {
-    dbPort = "5432"
-}
+	if dbPort == "" {
+		dbPort = "5432"
+	}
 
-dbUser := os.Getenv("DB_USER")
+	dbUser := os.Getenv("DB_USER")
 
-if dbUser == "" {
-    dbUser = "orderapi"
-}
+	if dbUser == "" {
+		dbUser = "orderapi"
+	}
 
-dbPass := os.Getenv("DB_PASSWORD")
+	dbPass := os.Getenv("DB_PASSWORD")
 
-if dbPass == "" {
-    dbPass = "changeme"
-}
+	if dbPass == "" {
+		dbPass = "changeme"
+	}
 
-dbName := os.Getenv("DB_NAME")
+	dbName := os.Getenv("DB_NAME")
 
-if dbName == "" {
-    dbName = "orders"
-}
+	if dbName == "" {
+		dbName = "orders"
+	}
 
-return Config{
-	Port:         ":" + port,
-	DatabaseHost: dbHost,
-	DatabasePort: dbPort,
-	DatabaseUser: dbUser,
-	DatabasePass: dbPass,
-	DatabaseName: dbName,
-}
+	return Config{
+		Port:         ":" + port,
+		DatabaseHost: dbHost,
+		DatabasePort: dbPort,
+		DatabaseUser: dbUser,
+		DatabasePass: dbPass,
+		DatabaseName: dbName,
+
+		AWSRegion: awsRegion,
+		QueueURL:  queueURL,
+	}
 }

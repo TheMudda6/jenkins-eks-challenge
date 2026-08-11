@@ -7,7 +7,7 @@ import (
 	"github.com/TheMudda6/jenkins-eks-challenge/application/internal/models"
 )
 
-func Health(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 

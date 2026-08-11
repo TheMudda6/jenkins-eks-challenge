@@ -7,11 +7,18 @@ import (
 	"github.com/TheMudda6/jenkins-eks-challenge/application/internal/handlers"
 	"github.com/TheMudda6/jenkins-eks-challenge/application/internal/config"
 	"github.com/TheMudda6/jenkins-eks-challenge/application/internal/database"
+	"github.com/TheMudda6/jenkins-eks-challenge/application/internal/queue"
 )
 
 func main() {
 
     cfg := config.Load()
+
+    sqsClient, err := queue.NewClient(cfg)
+
+    if err != nil {
+    panic(err)
+    }
 
     db, err := database.Connect(cfg)
 
@@ -25,9 +32,15 @@ func main() {
     panic(err)
 	}
 
-    http.HandleFunc("/", handlers.Home)
-    http.HandleFunc("/health", handlers.Health)
-    http.HandleFunc("/orders", handlers.Orders(db))
+    handler := handlers.Handler{
+	DB: db,
+    Config: cfg,
+    SQSClient: sqsClient,
+    }
+
+    http.HandleFunc("/", handler.Home)
+    http.HandleFunc("/health", handler.Health)
+    http.HandleFunc("/orders", handler.Orders)
 
     fmt.Println("Server starting on", cfg.Port)
 

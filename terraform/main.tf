@@ -106,6 +106,9 @@ module "eks" {
 # Purpose:
 # Creates the Amazon SQS queues used for asynchronous communication between
 # application services.
+#
+# Outputs have been defined in the SQS module to expose the queue URL, ARN and name for
+# consumption by other modules or resources.
 # -----------------------------------------------------------------------------
 
 module "sqs" {
@@ -113,4 +116,21 @@ module "sqs" {
 
   project_name = var.project_name
   environment  = var.environment
+
+}  
+
+  output "queue_url" {
+  description = "Orders queue URL"
+  value       = module.sqs.queue_url
 }
+
+output "queue_arn" {
+  description = "Orders queue ARN"
+  value       = module.sqs.queue_arn
+}
+
+output "queue_name" {
+  description = "Orders queue name"
+  value       = module.sqs.queue_name
+}
+

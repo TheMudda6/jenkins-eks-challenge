@@ -108,10 +108,42 @@ terraform plan -out=tfplan
 echo "✓ Terraform plan created."
 
 echo "Applying Terraform plan..."
+echo "Review the Terraform plan above."
+echo "Type 'yes' to continue."
 
-terraform apply -auto-approve tfplan
+terraform apply tfplan
 
 echo "✓ Terraform apply complete."
+
+echo
+echo "Retrieving Terraform outputs..."
+
+QUEUE_URL=$(terraform output -raw queue_url)
+
+if [ -z "$QUEUE_URL" ]; then
+    echo "ERROR: Failed to retrieve Queue URL."
+    exit 1
+fi
+
+echo "✓ Queue URL retrieved."
+
+QUEUE_ARN=$(terraform output -raw queue_arn)
+
+if [ -z "$QUEUE_ARN" ]; then
+    echo "ERROR: Failed to retrieve Queue ARN."
+    exit 1
+fi
+
+echo "✓ Queue ARN retrieved."
+
+QUEUE_NAME=$(terraform output -raw queue_name)
+
+if [ -z "$QUEUE_NAME" ]; then
+    echo "ERROR: Failed to retrieve Queue Name."
+    exit 1
+fi
+
+echo "✓ Queue name retrieved."
 
 # --------------------------------------------------------------------
 # Kubernetes Configuration
