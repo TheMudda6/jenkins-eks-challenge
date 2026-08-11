@@ -1,5 +1,3 @@
-print_banner "Installing Snapshot Infrastructure"
-
 echo "Installing Volume Snapshot CRDs..."
 
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/release-8.2/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml

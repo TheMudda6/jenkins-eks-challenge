@@ -117,9 +117,9 @@ module "sqs" {
   project_name = var.project_name
   environment  = var.environment
 
-}  
+}
 
-  output "queue_url" {
+output "queue_url" {
   description = "Orders queue URL"
   value       = module.sqs.queue_url
 }

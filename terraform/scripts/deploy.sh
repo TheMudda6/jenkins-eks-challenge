@@ -108,8 +108,6 @@ terraform plan -out=tfplan
 echo "✓ Terraform plan created."
 
 echo "Applying Terraform plan..."
-echo "Review the Terraform plan above."
-echo "Type 'yes' to continue."
 
 terraform apply tfplan
 
