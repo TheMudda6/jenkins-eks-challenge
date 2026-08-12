@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/TheMudda6/jenkins-eks-challenge/application/internal/database"
@@ -57,6 +58,7 @@ func (h *Handler) Orders(w http.ResponseWriter, r *http.Request) {
 		)
 
 		if err != nil {
+			log.Println(err)
 			http.Error(w, "Failed to publish event", http.StatusInternalServerError)
 			return
 		}

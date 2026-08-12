@@ -53,6 +53,13 @@ module "iam" {
   ebs_csi_driver_role_name                 = var.ebs_csi_driver_role_name
   aws_load_balancer_controller_role_name   = var.aws_load_balancer_controller_role_name
   aws_load_balancer_controller_policy_name = var.aws_load_balancer_controller_policy_name
+  application_role_name                    = var.application_role_name
+  application_policy_name                  = var.application_policy_name
+
+  application_namespace            = "jenkins"
+  application_service_account_name = "application-sa"
+
+  orders_queue_arn = module.sqs.queue_arn
 
   # ---------------------------------------------------------------------------
   # EKS OIDC Provider Information

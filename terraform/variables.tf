@@ -277,3 +277,11 @@ variable "namespace" {
   description = "Kubernetes namespace for application workloads."
   type        = string
 }
+
+variable "application_role_name" {
+  type = string
+}
+
+variable "application_policy_name" {
+  type = string
+}

@@ -83,3 +83,32 @@ variable "aws_load_balancer_controller_policy_name" {
   description = "Name of the IAM Policy for the AWS Load Balancer Controller."
   type        = string
 }
+
+# -----------------------------------------------------------------------------
+# Application IRSA
+# -----------------------------------------------------------------------------
+
+variable "application_role_name" {
+  description = "IAM Role name for the application."
+  type        = string
+}
+
+variable "application_policy_name" {
+  description = "IAM Policy name for the application."
+  type        = string
+}
+
+variable "application_namespace" {
+  description = "Kubernetes namespace where the application runs."
+  type        = string
+}
+
+variable "application_service_account_name" {
+  description = "Kubernetes Service Account used by the application."
+  type        = string
+}
+
+variable "orders_queue_arn" {
+  description = "ARN of the orders SQS queue."
+  type        = string
+}
