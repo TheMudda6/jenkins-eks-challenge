@@ -218,6 +218,37 @@ docker build \
 
 echo "✓ Docker image built successfully."
 
+# --------------------------------------------------------------------
+# Docker Tag
+#
+# Purpose:
+# Tag the locally built Docker image for Amazon ECR.
+# --------------------------------------------------------------------
+
+echo
+echo "Tagging Docker image..."
+
+docker tag \
+    application:latest \
+    "${REPOSITORY_URL}:latest"
+
+echo "✓ Docker image tagged."
+
+# --------------------------------------------------------------------
+# Docker Push
+#
+# Purpose:
+# Upload the application image to Amazon ECR so Kubernetes can pull it.
+# --------------------------------------------------------------------
+
+echo
+echo "Pushing Docker image to Amazon ECR..."
+
+docker push \
+    "${REPOSITORY_URL}:latest"
+
+echo "✓ Docker image pushed successfully."
+
 echo "Returning to Terraform directory..."
 
 cd "$TERRAFORM_DIR"
@@ -478,6 +509,67 @@ echo
 echo "✓ Redis verification complete."
 
 # --------------------------------------------------------------------
+# Application Deployment
+# --------------------------------------------------------------------
+
+print_banner "Deploying Application"
+
+echo "Creating Application Service Account..."
+
+kubectl apply -f k8s/application/application-serviceaccount.yaml
+
+echo "✓ Application Service Account created."
+
+echo "Creating Application Deployment..."
+
+kubectl apply -f k8s/application/application-deployment.yaml
+
+echo "✓ Application Deployment created."
+
+echo "Creating Application Service..."
+
+kubectl apply -f k8s/application/application-service.yaml
+
+echo "✓ Application Service created."
+
+echo
+echo "Waiting for Application deployment rollout..."
+
+kubectl rollout status \
+    deployment/application \
+    -n "$NAMESPACE" \
+    --timeout=300s
+
+echo "✓ Application Deployment rollout complete."
+
+echo
+echo "Waiting for Application Pod..."
+
+kubectl wait \
+    --for=condition=Ready \
+    pod \
+    -l app=application \
+    -n "$NAMESPACE" \
+    --timeout=300s
+
+echo "✓ Application Pod is ready."
+
+echo
+echo "Application Pods:"
+kubectl get pods -l app=application -n "$NAMESPACE"
+
+echo
+echo "Application Service:"
+kubectl get svc application -n "$NAMESPACE"
+
+echo
+echo "Application Endpoints:"
+kubectl get endpoints application -n "$NAMESPACE"
+
+echo
+echo "✓ Application verification complete."
+
+# --------------------------------------------------------------------
 # Jenkins Deployment
 # --------------------------------------------------------------------
 
@@ -647,6 +739,22 @@ kubectl get pods -l app=redis -n "$NAMESPACE"
 echo
 echo "Redis Service:"
 kubectl get svc redis -n "$NAMESPACE"
+
+echo
+echo "Application Deployment:"
+kubectl get deployment application -n "$NAMESPACE"
+
+echo
+echo "Application Pods:"
+kubectl get pods -l app=application -n "$NAMESPACE"
+
+echo
+echo "Application Service:"
+kubectl get svc application -n "$NAMESPACE"
+
+echo
+echo "Application Endpoints:"
+kubectl get endpoints application -n "$NAMESPACE"
 
 echo
 echo "Jenkins Deployment:"

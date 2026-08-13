@@ -260,6 +260,74 @@ echo
 
 echo "✓ Redis cleanup complete."
 
+# --------------------------------------------------------------------
+# Application Cleanup
+#
+# Purpose:
+# Remove the application resources before deleting the namespace.
+# --------------------------------------------------------------------
+
+print_banner "Removing Application"
+
+echo "Deleting Application Service..."
+
+kubectl delete \
+    -f k8s/application/application-service.yaml \
+    --ignore-not-found=true
+
+echo "✓ Application Service deleted."
+
+echo
+echo "Deleting Application Deployment..."
+
+kubectl delete \
+    -f k8s/application/application-deployment.yaml \
+    --ignore-not-found=true
+
+echo "✓ Application Deployment deleted."
+
+echo
+echo "Waiting for Application Deployment to terminate..."
+
+kubectl wait \
+    --for=delete \
+    deployment/application \
+    -n "$NAMESPACE" \
+    --timeout=300s || true
+
+echo "✓ Application Deployment removed."
+
+echo
+echo "Deleting Application Service Account..."
+
+kubectl delete \
+    -f k8s/application/application-serviceaccount.yaml \
+    --ignore-not-found=true
+
+echo "✓ Application Service Account deleted."
+
+echo
+echo "Application resources:"
+
+echo
+echo "Application Pods:"
+kubectl get pods -l app=application -n "$NAMESPACE" || true
+
+echo
+echo "Application Service:"
+kubectl get svc application -n "$NAMESPACE" || true
+
+echo
+echo "Application Deployment:"
+kubectl get deployment application -n "$NAMESPACE" || true
+
+echo
+echo "Application Service Account:"
+kubectl get sa application-sa -n "$NAMESPACE" || true
+
+echo
+echo "✓ Application cleanup complete."
+
 echo "Deleting Jenkins PVC..."
 kubectl delete -f k8s/jenkins/jenkins-pvc.yaml --ignore-not-found=true
 echo "✓ Jenkins PVC deleted."
