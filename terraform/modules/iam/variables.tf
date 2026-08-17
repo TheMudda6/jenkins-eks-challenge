@@ -112,3 +112,17 @@ variable "orders_queue_arn" {
   description = "ARN of the orders SQS queue."
   type        = string
 }
+
+# --------------------------------------------------------------------
+# GitHub Actions
+# --------------------------------------------------------------------
+
+variable "ecr_repository_arn" {
+  description = "ARN of the ECR repository used by GitHub Actions."
+  type        = string
+}
+
+variable "github_actions_oidc_role_name" {
+  description = "Name of the IAM Role for GitHub Actions OIDC."
+  type        = string
+}

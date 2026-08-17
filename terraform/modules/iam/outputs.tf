@@ -29,4 +29,7 @@ output "ebs_csi_driver_role_arn" {
   description = "ARN of the EBS CSI Driver IAM role."
 }
 
-
+output "github_actions_role_arn" {
+  description = "ARN of the GitHub Actions IAM Role"
+  value       = aws_iam_role.github_actions_oidc_role.arn
+}

@@ -285,3 +285,7 @@ variable "application_role_name" {
 variable "application_policy_name" {
   type = string
 }
+
+variable "github_actions_oidc_role_name" {
+  type = string
+}

@@ -56,6 +56,10 @@ module "iam" {
   application_role_name                    = var.application_role_name
   application_policy_name                  = var.application_policy_name
 
+  github_actions_oidc_role_name = var.github_actions_oidc_role_name
+
+  ecr_repository_arn = module.ecr.repository_arn
+
   application_namespace            = "jenkins"
   application_service_account_name = "application-sa"
 
@@ -156,4 +160,9 @@ output "repository_url" {
 output "repository_name" {
   description = "Application ECR repository name"
   value       = module.ecr.repository_name
+}
+
+output "github_actions_role_arn" {
+  description = "GitHub Actions IAM Role ARN"
+  value       = module.iam.github_actions_role_arn
 }
