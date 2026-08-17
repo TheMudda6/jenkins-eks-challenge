@@ -19,7 +19,7 @@ jobs:
 
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4.0.0
+              uses: actions/checkout@v4
             
             - name: Set up Go
               uses: actions/setup-go@v5
@@ -32,14 +32,42 @@ jobs:
 
             - name: Build Application
               working-directory: application
-              run: go build -o app ./cmd/api
+              run: go build -o api ./cmd/api
 
             - name: Run tests
               working-directory: application
               run: go test ./...
 
             - name: Configure AWS credentials
-              uses: aws-actions/configure-aws-credentials@v2
+              uses: aws-actions/configure-aws-credentials@v4
               with:
                 role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-                aws-region: us-east-1
+                aws-region: ${{ vars.AWS_REGION }}
+
+            - name: Login to Amazon ECR
+              id: login-ecr
+              uses: aws-actions/amazon-ecr-login@v2
+
+            - name: Build Docker image
+              working-directory: .
+              run: |
+                docker build \
+                -t application:latest \
+                -f application/Dockerfile \
+                application
+
+            - name: Tag Docker image
+              run: |
+                docker tag application:latest \
+                ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+
+                docker tag application:latest \
+                ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
+
+            - name: Push Docker image
+              run: |
+                docker push \
+                ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+
+                docker push \
+                ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
