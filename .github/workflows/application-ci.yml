@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - stable-v1.31
 
   pull_request:
     branches:
@@ -12,6 +13,9 @@ on:
 permissions:
   id-token: write
   contents: read
+
+env:
+  IMAGE_NAME: application
 
 jobs:
     build:
@@ -24,7 +28,7 @@ jobs:
             - name: Set up Go
               uses: actions/setup-go@v5
               with:
-                go-version: "1.25"
+                go-version: "1.25.0"
 
             - name: Download Go Modules
               working-directory: application
@@ -49,25 +53,24 @@ jobs:
               uses: aws-actions/amazon-ecr-login@v2
 
             - name: Build Docker image
-              working-directory: .
               run: |
                 docker build \
-                -t application:latest \
+                -t ${{ env.IMAGE_NAME }}:latest \
                 -f application/Dockerfile \
                 application
 
             - name: Tag Docker image
               run: |
-                docker tag application:latest \
-                ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+                docker tag ${{ env.IMAGE_NAME }}:latest \
+                  ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
 
-                docker tag application:latest \
-                ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
+                docker tag ${{ env.IMAGE_NAME }}:latest \
+                  ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
 
             - name: Push Docker image
               run: |
                 docker push \
-                ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+                  ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
 
                 docker push \
-                ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
+                  ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
