@@ -112,6 +112,22 @@ module "eks" {
 }
 
 # -----------------------------------------------------------------------------
+# ArgoCD Module
+#
+# Purpose:
+# Installs ArgoCD into the Kubernetes cluster using Helm.
+# ArgoCD will later become responsible for deploying the application
+# from the Git repository (GitOps).
+# -----------------------------------------------------------------------------
+
+module "argocd" {
+  source = "./modules/argocd"
+
+  namespace    = "argocd"
+  chart_version = var.argocd_chart_version
+}
+
+# -----------------------------------------------------------------------------
 # SQS Module
 #
 # Purpose:

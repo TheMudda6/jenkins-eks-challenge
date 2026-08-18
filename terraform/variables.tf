@@ -289,3 +289,8 @@ variable "application_policy_name" {
 variable "github_actions_oidc_role_name" {
   type = string
 }
+
+variable "argocd_chart_version" {
+  description = "Version of the ArgoCD Helm chart."
+  type        = string
+}
