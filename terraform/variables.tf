@@ -208,7 +208,7 @@ variable "cluster_version" {
 variable "instance_type" {
   description = "EC2 instance type for the EKS worker nodes."
   type        = string
-  default     = "t3.small"
+  default     = "t3.medium"
 }
 
 # -----------------------------------------------------------------------------

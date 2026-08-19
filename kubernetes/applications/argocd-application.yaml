@@ -10,7 +10,7 @@ spec:
 
   source:
     repoURL: https://github.com/TheMudda6/jenkins-eks-challenge.git
-    targetRevision: main
+    targetRevision: "stable-v1.31"
     path: kubernetes/jenkins
 
   destination:
