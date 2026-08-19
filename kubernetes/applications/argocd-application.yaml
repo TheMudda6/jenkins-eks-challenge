@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 
 metadata:
-  name: jenkins-platform
+  name: jenkins-application
   namespace: argocd
 
 spec:
@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/TheMudda6/jenkins-eks-challenge.git
     targetRevision: main
-    path: kubernetes
+    path: kubernetes/jenkins
 
   destination:
     server: https://kubernetes.default.svc
