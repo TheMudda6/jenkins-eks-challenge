@@ -123,7 +123,7 @@ module "eks" {
 module "argocd" {
   source = "./modules/argocd"
 
-  namespace    = "argocd"
+  namespace     = "argocd"
   chart_version = var.argocd_chart_version
 }
 

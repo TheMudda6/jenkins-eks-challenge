@@ -267,6 +267,25 @@ aws eks update-kubeconfig \
 
 kubectl get nodes
 
+echo
+echo "Waiting for ArgoCD..."
+
+kubectl wait \
+  --for=condition=Available \
+  deployment/argocd-server \
+  -n argocd \
+  --timeout=300s
+
+echo "✓ ArgoCD is ready."
+
+echo
+echo "Applying ArgoCD root Application..."
+
+kubectl apply \
+  -f "$REPO_ROOT/kubernetes/applications/argocd-application.yaml"
+
+echo "✓ ArgoCD root Application applied."
+
 echo "✓ Cluster connectivity verified."
 
 echo
