@@ -40,7 +40,7 @@ resource "aws_s3_bucket_ownership_controls" "terraform_state" {
 terraform {
   backend "s3" {
     bucket = "mudassir-tf-state-893061519920"
-    key = "bootstrap/terraform.tfstate"
+    key    = "bootstrap/terraform.tfstate"
     region = "eu-west-2"
   }
 }
