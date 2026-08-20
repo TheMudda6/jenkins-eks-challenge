@@ -8,45 +8,14 @@ resource "helm_release" "argocd" {
 
   version = var.chart_version
 
-  values = [
-    yamlencode({
-      extraObjects = [
-        {
-          apiVersion = "argoproj.io/v1alpha1"
-          kind       = "Application"
+}
 
-          metadata = {
-            name      = "jenkins-application"
-            namespace = var.namespace
-          }
+resource "helm_release" "jenkins_application" {
+  name      = "jenkins-application"
+  chart     = "${path.module}/jenkins-application"
+  namespace = var.namespace
 
-          spec = {
-            project = "default"
-
-            source = {
-              repoURL        = var.repository_url
-              targetRevision = var.target_revision
-              path           = var.application_path
-            }
-
-            destination = {
-              server    = "https://kubernetes.default.svc"
-              namespace = "jenkins"
-            }
-
-            syncPolicy = {
-              automated = {
-                prune    = true
-                selfHeal = true
-              }
-
-              syncOptions = [
-                "CreateNamespace=true"
-              ]
-            }
-          }
-        }
-      ]
-    })
+  depends_on = [
+    helm_release.argocd
   ]
 }
