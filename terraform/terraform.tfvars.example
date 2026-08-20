@@ -65,10 +65,10 @@ aws_load_balancer_controller_policy_name = "AWSLoadBalancerControllerIAMPolicy"
 # =============================================================================
 
 cluster_name    = "jenkins-eks"
-cluster_version = "1.30"
+cluster_version = "1.31"
 
-instance_type = "t3.small"
+instance_type = "t3.medium"
 
 min_size     = 1
-desired_size = 1
+desired_size = 2
 max_size     = 2
