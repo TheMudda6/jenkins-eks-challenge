@@ -110,7 +110,23 @@ else
 fi
 fi
 
+echo "Deleting Jenkins ArgoCD Application..."
 
+kubectl delete application jenkins-application \
+  -n argocd \
+  --ignore-not-found=true
+
+echo "✓ Jenkins ArgoCD Application deleted."
+
+echo "Waiting for Jenkins ArgoCD Application to be removed..."
+
+kubectl wait \
+  --for=delete \
+  application/jenkins-application \
+  -n argocd \
+  --timeout=300s || true
+
+echo "✓ Jenkins ArgoCD Application removed."
 
 echo "Deleting Jenkins ingress..."
 kubectl delete -f k8s/jenkins/jenkins-ingress.yaml --ignore-not-found=true
