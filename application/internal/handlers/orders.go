@@ -37,12 +37,14 @@ func (h *Handler) Orders(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = database.CreateOrder(h.DB, order)
+		id, err := database.CreateOrder(h.DB, order)
 
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
 		}
+
+		order.ID = id
 
 		message, err := json.Marshal(order)
 

@@ -1,31 +1,31 @@
 package database
 
 import (
-    "database/sql"
-    "fmt"
+	"database/sql"
+	"fmt"
 
-    "github.com/TheMudda6/jenkins-eks-challenge/application/internal/config"
+	"github.com/TheMudda6/jenkins-eks-challenge/application/internal/config"
 	"github.com/TheMudda6/jenkins-eks-challenge/application/internal/models"
 
-    _ "github.com/lib/pq"
+	_ "github.com/lib/pq"
 )
 
 func Connect(cfg config.Config) (*sql.DB, error) {
 
 	connStr := fmt.Sprintf(
-	"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-	cfg.DatabaseHost,
-	cfg.DatabasePort,
-	cfg.DatabaseUser,
-	cfg.DatabasePass,
-	cfg.DatabaseName,
-)
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		cfg.DatabaseHost,
+		cfg.DatabasePort,
+		cfg.DatabaseUser,
+		cfg.DatabasePass,
+		cfg.DatabaseName,
+	)
 
 	db, err := sql.Open("postgres", connStr)
 
-if err != nil {
-    return nil, err
-}
+	if err != nil {
+		return nil, err
+	}
 
 	err = db.Ping()
 
@@ -60,25 +60,28 @@ func CreateOrdersTable(db *sql.DB) error {
 	return nil
 }
 
-func CreateOrder(db *sql.DB, order models.Order) error {
+func CreateOrder(db *sql.DB, order models.Order) (int, error) {
 
 	query := `
-	INSERT INTO orders (customer_name, product_name, quantity)
-	VALUES ($1, $2, $3)
-	`
+    INSERT INTO orders (customer_name, product_name, quantity)
+    VALUES ($1, $2, $3)
+    RETURNING id
+    `
 
-	_, err := db.Exec(
+	var id int
+
+	err := db.QueryRow(
 		query,
 		order.CustomerName,
 		order.ProductName,
 		order.Quantity,
-	)
+	).Scan(&id)
 
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return id, nil
 }
 
 func GetOrders(db *sql.DB) ([]models.Order, error) {
