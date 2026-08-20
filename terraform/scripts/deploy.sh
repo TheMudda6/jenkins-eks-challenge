@@ -549,12 +549,39 @@ echo "✓ Application Service created."
 echo
 echo "Waiting for Application deployment rollout..."
 
-kubectl rollout status \
-    deployment/application \
-    -n "$NAMESPACE" \
-    --timeout=300s
+APPLICATION_ROLLOUT_ATTEMPTS=15
+APPLICATION_ROLLOUT_ATTEMPT=1
 
-echo "✓ Application Deployment rollout complete."
+while [ "$APPLICATION_ROLLOUT_ATTEMPT" -le "$APPLICATION_ROLLOUT_ATTEMPTS" ]; do
+    echo "Application rollout attempt $APPLICATION_ROLLOUT_ATTEMPT/$APPLICATION_ROLLOUT_ATTEMPTS..."
+
+    if kubectl rollout status \
+        deployment/application \
+        -n "$NAMESPACE" \
+        --timeout=60s; then
+
+        echo "✓ Application Deployment rollout complete."
+        break
+    fi
+
+    if [ "$APPLICATION_ROLLOUT_ATTEMPT" -eq "$APPLICATION_ROLLOUT_ATTEMPTS" ]; then
+        echo "ERROR: Application deployment did not become ready within the allowed time."
+        echo
+        echo "Application Pods:"
+        kubectl get pods -l app=application -n "$NAMESPACE" || true
+        echo
+        echo "Application Events:"
+        kubectl describe deployment application -n "$NAMESPACE" || true
+        exit 1
+    fi
+
+    echo "WARNING: Application rollout has not completed yet."
+    echo "This may be caused by a temporary image pull or startup delay."
+    echo "Retrying in 30 seconds..."
+    sleep 30
+
+    APPLICATION_ROLLOUT_ATTEMPT=$((APPLICATION_ROLLOUT_ATTEMPT + 1))
+done
 
 echo
 echo "Waiting for Application Pod..."
