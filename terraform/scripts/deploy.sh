@@ -279,12 +279,7 @@ kubectl wait \
 echo "✓ ArgoCD is ready."
 
 echo
-echo "Applying ArgoCD root Application..."
-
-kubectl apply \
-  -f "$REPO_ROOT/kubernetes/applications/argocd-application.yaml"
-
-echo "✓ ArgoCD root Application applied."
+echo "✓ ArgoCD Application is managed by Terraform."
 
 echo "✓ Cluster connectivity verified."
 
