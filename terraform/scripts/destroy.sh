@@ -3,7 +3,7 @@
 set -euo pipefail
 
 cleanup() {
-    rm -f tfplan destroy.tfplan
+    rm -f tfplan dns.tfplan destroy.tfplan
 }
 
 trap cleanup EXIT
@@ -191,12 +191,53 @@ echo "✓ PostgreSQL Pods verified."
 echo
 echo "Deleting PostgreSQL PVC..."
 
-kubectl delete \
-    pvc/postgres-data-postgres-0 \
-    -n "$NAMESPACE" \
-    --ignore-not-found=true
+POSTGRES_PV=$(kubectl get pvc postgres-data-postgres-0 \
+  -n "$NAMESPACE" \
+  -o jsonpath='{.spec.volumeName}' 2>/dev/null || true)
 
-echo "✓ PostgreSQL PVC deleted."
+if [ -n "$POSTGRES_PV" ]; then
+  echo "✓ PostgreSQL PV identified: $POSTGRES_PV"
+else
+  echo "No PostgreSQL PV found."
+fi
+
+kubectl delete \
+  pvc/postgres-data-postgres-0 \
+  -n "$NAMESPACE" \
+  --ignore-not-found=true
+
+echo "✓ PostgreSQL PVC deletion requested."
+
+echo
+echo "Waiting for PostgreSQL PVC to be removed..."
+
+if kubectl wait \
+  --for=delete \
+  pvc/postgres-data-postgres-0 \
+  -n "$NAMESPACE" \
+  --timeout=300s; then
+  echo "✓ PostgreSQL PVC removed."
+else
+  echo "WARNING: PostgreSQL PVC still exists after timeout."
+fi
+
+if [ -n "$POSTGRES_PV" ]; then
+    echo
+    echo "Waiting for PostgreSQL PV to be removed..."
+
+    if kubectl get pv "$POSTGRES_PV" >/dev/null 2>&1; then
+        if kubectl wait \
+            --for=delete \
+            "pv/$POSTGRES_PV" \
+            --timeout=300s; then
+            echo "✓ PostgreSQL PV removed."
+        else
+            echo "WARNING: PostgreSQL PV still exists: $POSTGRES_PV"
+        fi
+    else
+        echo "✓ PostgreSQL PV already removed."
+    fi
+fi
 
 echo
 echo "Deleting PostgreSQL Service..."

@@ -75,7 +75,7 @@ spec:
         accessModes:
           - ReadWriteOnce
 
-        storageClassName: gp3-retain
+        storageClassName: gp3
 
         resources:
           requests:
