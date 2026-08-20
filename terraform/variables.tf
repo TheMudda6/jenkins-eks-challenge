@@ -294,3 +294,23 @@ variable "argocd_chart_version" {
   description = "Version of the ArgoCD Helm chart."
   type        = string
 }
+# -----------------------------------------------------------------------------
+# Cloudflare DNS
+# -----------------------------------------------------------------------------
+
+variable "cloudflare_zone_name" {
+  description = "Cloudflare zone name."
+  type        = string
+}
+
+variable "jenkins_hostname" {
+  description = "Hostname used to access Jenkins."
+  type        = string
+  default     = "jenkins.mud-as-sir.uk"
+}
+
+variable "alb_hostname" {
+  description = "AWS ALB hostname created by the Kubernetes Ingress."
+  type        = string
+  default     = ""
+}

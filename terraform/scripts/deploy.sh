@@ -3,7 +3,7 @@
 set -euo pipefail
 
 cleanup() {
-    rm -f tfplan
+    rm -f tfplan dns.tfplan
 }
 
 trap cleanup EXIT
@@ -699,6 +699,26 @@ kubectl get ingress -n "$NAMESPACE"
 echo
 echo "Ingress details:"
 kubectl describe ingress jenkins-ingress -n "$NAMESPACE"
+
+# --------------------------------------------------------------------
+# Cloudflare DNS Configuration
+# --------------------------------------------------------------------
+
+print_banner "Configuring Cloudflare DNS"
+
+echo "Creating Terraform plan for Cloudflare DNS..."
+
+terraform plan \
+  -var="alb_hostname=$ALB_HOSTNAME" \
+  -out=dns.tfplan
+
+echo "✓ Cloudflare DNS plan created."
+
+echo "Applying Cloudflare DNS plan..."
+
+terraform apply dns.tfplan
+
+echo "✓ Cloudflare DNS configured."
 
 # --------------------------------------------------------------------
 # Deployment Verification
