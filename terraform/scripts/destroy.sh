@@ -14,6 +14,25 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT"
 
+# --------------------------------------------------------------------
+# Environment Variables
+#
+# Purpose:
+# Load local environment variables required by Terraform providers.
+# --------------------------------------------------------------------
+
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
+if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+    echo "ERROR: CLOUDFLARE_API_TOKEN is not set."
+    echo "Create a .env file containing your Cloudflare API token."
+    exit 1
+fi
+
 export AWS_PAGER=""
 
 # --------------------------------------------------------------------

@@ -16,6 +16,25 @@ REPO_ROOT="$(dirname "$TERRAFORM_DIR")"
 cd "$TERRAFORM_DIR"
 
 # --------------------------------------------------------------------
+# Environment Variables
+#
+# Purpose:
+# Load local environment variables required by Terraform providers.
+# --------------------------------------------------------------------
+
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
+if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+    echo "ERROR: CLOUDFLARE_API_TOKEN is not set."
+    echo "Create a .env file containing your Cloudflare API token."
+    exit 1
+fi
+
+# --------------------------------------------------------------------
 # Deployment Configuration
 #
 # Purpose:
