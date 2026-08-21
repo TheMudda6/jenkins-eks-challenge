@@ -1,0 +1,7 @@
+resources:
+  - application
+  - jenkins
+  - postgres
+  - redis
+  - storage
+  - secrets

@@ -79,7 +79,7 @@ The platform currently includes:
 ├── kubernetes/              # Learning notes and Kubernetes practice resources
 ├── screenshots/             # Project screenshots
 ├── terraform/
-│   ├── k8s/                 # Kubernetes manifests
+│   ├── infrastructure/                 # Kubernetes manifests
 │   ├── modules/
 │   │   ├── eks/
 │   │   ├── iam/

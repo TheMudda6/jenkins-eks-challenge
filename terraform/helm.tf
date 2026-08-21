@@ -39,3 +39,21 @@ resource "helm_release" "aws_load_balancer_controller" {
     module.iam,
   ]
 }
+
+resource "helm_release" "external_secrets" {
+  name             = "external-secrets"
+  repository       = "https://charts.external-secrets.io"
+  chart            = "external-secrets"
+  namespace        = "external-secrets"
+  create_namespace = true
+
+  depends_on = [
+    module.eks
+  ]
+
+  values = [
+    yamlencode({
+      installCRDs = true
+    })
+  ]
+}

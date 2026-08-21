@@ -126,3 +126,8 @@ variable "github_actions_oidc_role_name" {
   description = "Name of the IAM Role for GitHub Actions OIDC."
   type        = string
 }
+
+variable "postgres_secret_arn" {
+  description = "ARN of the PostgreSQL secret stored in AWS Secrets Manager."
+  type        = string
+}

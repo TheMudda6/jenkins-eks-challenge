@@ -56,7 +56,7 @@ echo "✓ Snapshot Controller is ready."
 echo ""
 echo "Creating VolumeSnapshotClass..."
 
-kubectl apply -f k8s/storage/volumesnapshotclass.yaml
+kubectl apply -f infrastructure/storage/volumesnapshotclass.yaml
 
 echo "✓ VolumeSnapshotClass created."
 

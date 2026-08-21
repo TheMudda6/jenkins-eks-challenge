@@ -129,7 +129,7 @@ kubectl wait \
 echo "✓ Jenkins ArgoCD Application removed."
 
 echo "Deleting Jenkins ingress..."
-kubectl delete -f k8s/jenkins/jenkins-ingress.yaml --ignore-not-found=true
+kubectl delete -f infrastructure/jenkins/jenkins-ingress.yaml --ignore-not-found=true
 echo "✓ Jenkins ingress deleted."
 
 echo
@@ -144,12 +144,49 @@ kubectl wait \
 echo "✓ Jenkins Ingress removed."
 
 echo "Deleting Jenkins service..."
-kubectl delete -f k8s/jenkins/jenkins-service.yaml --ignore-not-found=true
+kubectl delete -f infrastructure/jenkins/jenkins-service.yaml --ignore-not-found=true
 echo "✓ Jenkins service deleted."
 
 echo "Deleting Jenkins deployment..."
-kubectl delete -f k8s/jenkins/jenkins-deployment.yaml --ignore-not-found=true
+kubectl delete -f infrastructure/jenkins/jenkins-deployment.yaml --ignore-not-found=true
 echo "✓ Jenkins deployment deleted."
+
+# --------------------------------------------------------------------
+# External Secrets Cleanup
+#
+# Purpose:
+# Remove External Secrets resources before deleting PostgreSQL.
+# --------------------------------------------------------------------
+
+print_banner "Removing External Secrets"
+
+echo "Deleting PostgreSQL ExternalSecret..."
+
+kubectl delete \
+    -f infrastructure/secrets/postgres-external-secret.yaml \
+    --ignore-not-found=true
+
+echo "✓ PostgreSQL ExternalSecret deleted."
+
+
+echo
+echo "Deleting ClusterSecretStore..."
+
+kubectl delete \
+    -f infrastructure/secrets/cluster-secret-store.yaml \
+    --ignore-not-found=true
+
+echo "✓ ClusterSecretStore deleted."
+
+
+echo
+echo "Verifying generated Kubernetes Secret removal..."
+
+kubectl delete secret postgres-secret \
+    -n "$NAMESPACE" \
+    --ignore-not-found=true
+
+echo "✓ PostgreSQL Kubernetes Secret deleted."
 
 # --------------------------------------------------------------------
 # PostgreSQL Cleanup
@@ -163,7 +200,7 @@ print_banner "Removing PostgreSQL"
 echo "Deleting PostgreSQL StatefulSet..."
 
 kubectl delete \
-    -f k8s/postgres/postgres-statefulset.yaml \
+    -f infrastructure/postgres/postgres-statefulset.yaml \
     --ignore-not-found=true
 
 echo "✓ PostgreSQL StatefulSet deleted."
@@ -243,27 +280,10 @@ echo
 echo "Deleting PostgreSQL Service..."
 
 kubectl delete \
-    -f k8s/postgres/postgres-service.yaml \
+    -f infrastructure/postgres/postgres-service.yaml \
     --ignore-not-found=true
 
 echo "✓ PostgreSQL Service deleted."
-
-echo
-echo "Deleting PostgreSQL Secret..."
-
-kubectl delete \
-    secret/postgres-secret \
-    -n "$NAMESPACE" \
-    --ignore-not-found=true
-
-echo "✓ PostgreSQL Secret deleted."
-
-echo
-echo "Removing generated PostgreSQL Secret..."
-
-rm -f k8s/postgres/postgres-secret.yaml
-
-echo "✓ Generated PostgreSQL Secret cleaned up."
 
 # --------------------------------------------------------------------
 # Redis Cleanup
@@ -277,7 +297,7 @@ print_banner "Removing Redis"
 echo "Deleting Redis Deployment..."
 
 kubectl delete \
-    -f k8s/redis/redis-deployment.yaml \
+    -f infrastructure/redis/redis-deployment.yaml \
     --ignore-not-found=true
 
 echo "✓ Redis Deployment deleted."
@@ -297,7 +317,7 @@ echo
 echo "Deleting Redis Service..."
 
 kubectl delete \
-    -f k8s/redis/redis-service.yaml \
+    -f infrastructure/redis/redis-service.yaml \
     --ignore-not-found=true
 
 echo "✓ Redis Service deleted."
@@ -329,7 +349,7 @@ print_banner "Removing Application"
 echo "Deleting Application Service..."
 
 kubectl delete \
-    -f k8s/application/application-service.yaml \
+    -f infrastructure/application/application-service.yaml \
     --ignore-not-found=true
 
 echo "✓ Application Service deleted."
@@ -338,7 +358,7 @@ echo
 echo "Deleting Application Deployment..."
 
 kubectl delete \
-    -f k8s/application/application-deployment.yaml \
+    -f infrastructure/application/application-deployment.yaml \
     --ignore-not-found=true
 
 echo "✓ Application Deployment deleted."
@@ -358,7 +378,7 @@ echo
 echo "Deleting Application Service Account..."
 
 kubectl delete \
-    -f k8s/application/application-serviceaccount.yaml \
+    -f infrastructure/application/application-serviceaccount.yaml \
     --ignore-not-found=true
 
 echo "✓ Application Service Account deleted."
@@ -386,8 +406,16 @@ echo
 echo "✓ Application cleanup complete."
 
 echo "Deleting Jenkins PVC..."
-kubectl delete -f k8s/jenkins/jenkins-pvc.yaml --ignore-not-found=true
+kubectl delete -f infrastructure/jenkins/jenkins-pvc.yaml --ignore-not-found=true
 echo "✓ Jenkins PVC deleted."
+
+echo
+echo "Remaining External Secrets:"
+kubectl get externalsecret -A || true
+
+echo
+echo "Remaining ClusterSecretStores:"
+kubectl get clustersecretstore || true
 
 echo "Deleting Jenkins namespace..."
 kubectl delete namespace "$NAMESPACE" --ignore-not-found=true
@@ -422,7 +450,7 @@ kubectl get ingress -A || true
 
 print_banner "Removing Snapshot Infrastructure"
 
-bash k8s/snapshot/uninstall.sh
+bash infrastructure/snapshot/uninstall.sh
 echo "✓ Snapshot infrastructure removed."
 
 # --------------------------------------------------------------------
@@ -434,10 +462,10 @@ echo "✓ Snapshot infrastructure removed."
 
 print_banner "Removing Storage Resources"
 
-kubectl delete -f k8s/storage/gp3-retain-storageclass.yaml --ignore-not-found=true
+kubectl delete -f infrastructure/storage/gp3-retain-storageclass.yaml --ignore-not-found=true
 echo "✓ gp3-retain StorageClass deleted."
 
-kubectl delete -f k8s/storage/gp3-storageclass.yaml --ignore-not-found=true
+kubectl delete -f infrastructure/storage/gp3-storageclass.yaml --ignore-not-found=true
 echo "✓ gp3 StorageClass deleted."
 
 # --------------------------------------------------------------------
@@ -526,7 +554,9 @@ kubectl get deployment snapshot-controller -n kube-system 2>/dev/null || echo "�
 
 echo
 echo "Snapshot CRDs:"
-kubectl get crd | grep snapshot || echo "✓ No Snapshot CRDs found."
+kubectl get crd | grep snapshot || true
+
+echo "✓ Snapshot CRD verification complete."
 
 aws logs delete-log-group \
   --log-group-name "/aws/eks/${CLUSTER_NAME}/cluster" \

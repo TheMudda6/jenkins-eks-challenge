@@ -1,0 +1,4 @@
+resources:
+  - application-deployment.yaml
+  - application-service.yaml
+  - application-serviceaccount.yaml

@@ -1,0 +1,4 @@
+resources:
+  - gp3-storageclass.yaml
+  - gp3-retain-storageclass.yaml
+  - volumesnapshotclass.yaml

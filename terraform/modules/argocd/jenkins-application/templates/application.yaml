@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/TheMudda6/jenkins-eks-challenge.git
     targetRevision: stable-v1.31
-    path: terraform/k8s/application
+    path: terraform/infrastructure
 
   destination:
     server: https://kubernetes.default.svc

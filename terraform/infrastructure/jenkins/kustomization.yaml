@@ -1,0 +1,5 @@
+resources:
+  - jenkins-deployment.yaml
+  - jenkins-service.yaml
+  - jenkins-ingress.yaml
+  - jenkins-pvc.yaml

@@ -65,16 +65,12 @@ module "iam" {
 
   orders_queue_arn = module.sqs.queue_arn
 
-  # ---------------------------------------------------------------------------
-  # EKS OIDC Provider Information
-  #
-  # Purpose:
-  # Passes the EKS OpenID Connect (OIDC) provider details into the IAM
-  # module so IAM Roles for Service Accounts (IRSA) can be configured.
-  # ---------------------------------------------------------------------------
+  postgres_secret_arn = module.secrets.postgres_secret_arn
 
-  oidc_provider_arn       = module.eks.oidc_provider_arn
+  oidc_provider_arn = module.eks.oidc_provider_arn
+
   cluster_oidc_issuer_url = module.eks.cluster_oidc_issuer_url
+
 }
 
 # -----------------------------------------------------------------------------
@@ -128,7 +124,7 @@ module "argocd" {
 
   repository_url   = "https://github.com/TheMudda6/jenkins-eks-challenge.git"
   target_revision  = "stable-v1.31"
-  application_path = "terraform/k8s/application"
+  application_path = "terraform/infrastructure"
 }
 
 # -----------------------------------------------------------------------------
@@ -185,4 +181,10 @@ output "repository_name" {
 output "github_actions_role_arn" {
   description = "GitHub Actions IAM Role ARN"
   value       = module.iam.github_actions_role_arn
+}
+
+module "secrets" {
+  source = "./modules/secrets"
+
+  postgres_password = var.postgres_password
 }

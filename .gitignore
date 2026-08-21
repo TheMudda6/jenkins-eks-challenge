@@ -29,7 +29,7 @@ tfplan
 destroy.tfplan
 crash.log
 .terraform.tfstate.lock.info
-k8s/postgres/postgres-secret.yaml
+infrastructure/postgres/postgres-secret.yaml
 
 # Debug
 
@@ -55,8 +55,8 @@ Thumbs.db
 # Ignore Secrets generated during deployment.
 # --------------------------------------------------------------------
 
-terraform/k8s/postgres/postgres-secret.yaml
-terraform/k8s/redis/redis-secret.yaml
+terraform/infrastructure/postgres/postgres-secret.yaml
+terraform/infrastructure/redis/redis-secret.yaml
 
 # Local deployment configuration
 terraform/.env

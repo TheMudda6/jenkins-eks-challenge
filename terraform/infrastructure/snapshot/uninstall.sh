@@ -1,6 +1,6 @@
 echo "Removing VolumeSnapshotClass..."
 
-kubectl delete -f k8s/storage/volumesnapshotclass.yaml \
+kubectl delete -f infrastructure/storage/volumesnapshotclass.yaml \
   --ignore-not-found=true
 
 echo "✓ VolumeSnapshotClass removed."
