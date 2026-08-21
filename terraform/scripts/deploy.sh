@@ -22,15 +22,17 @@ cd "$TERRAFORM_DIR"
 # Load local environment variables required by Terraform providers.
 # --------------------------------------------------------------------
 
-if [ -f .env ]; then
+ENV_FILE="$REPO_ROOT/.env"
+
+if [ -f "$ENV_FILE" ]; then
     set -a
-    source .env
+    source "$ENV_FILE"
     set +a
 fi
 
-if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-    echo "ERROR: CLOUDFLARE_API_TOKEN is not set."
-    echo "Create a .env file containing your Cloudflare API token."
+if [ -z "${TF_VAR_cloudflare_api_token:-}" ]; then
+    echo "ERROR: TF_VAR_cloudflare_api_token is not set."
+    echo "Check $ENV_FILE"
     exit 1
 fi
 
@@ -127,6 +129,14 @@ echo "✓ Terraform validation complete."
 print_banner "Terraform Deployment"
 
 echo "Creating Terraform execution plan..."
+
+echo "Checking Terraform Cloudflare token availability..."
+
+if terraform console <<< "var.cloudflare_api_token" >/dev/null 2>&1; then
+    echo "✓ Terraform variable available."
+else
+    echo "WARNING: Terraform variable check failed."
+fi
 
 terraform plan -out=tfplan
 

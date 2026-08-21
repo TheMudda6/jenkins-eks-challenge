@@ -303,6 +303,12 @@ variable "cloudflare_zone_name" {
   type        = string
 }
 
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token used for DNS management"
+  type        = string
+  sensitive   = true
+}
+
 variable "jenkins_hostname" {
   description = "Hostname used to access Jenkins."
   type        = string

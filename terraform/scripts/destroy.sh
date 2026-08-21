@@ -11,25 +11,25 @@ trap 'echo ""; echo "ERROR: Cleanup failed on line $LINENO"; exit 1' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"
 
-cd "$PROJECT_ROOT"
+cd "$TERRAFORM_DIR"
 
 # --------------------------------------------------------------------
 # Environment Variables
-#
-# Purpose:
-# Load local environment variables required by Terraform providers.
 # --------------------------------------------------------------------
 
-if [ -f .env ]; then
+ENV_FILE="$PROJECT_ROOT/.env"
+
+if [ -f "$ENV_FILE" ]; then
     set -a
-    source .env
+    source "$ENV_FILE"
     set +a
 fi
 
-if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-    echo "ERROR: CLOUDFLARE_API_TOKEN is not set."
-    echo "Create a .env file containing your Cloudflare API token."
+if [ -z "${TF_VAR_cloudflare_api_token:-}" ]; then
+    echo "ERROR: TF_VAR_cloudflare_api_token is not set."
+    echo "Check $ENV_FILE"
     exit 1
 fi
 
@@ -68,6 +68,7 @@ print_banner() {
 command -v terraform >/dev/null || { echo "ERROR: Terraform is not installed."; exit 1; }
 command -v aws >/dev/null || { echo "ERROR: AWS CLI is not installed."; exit 1; }
 command -v kubectl >/dev/null || { echo "ERROR: kubectl is not installed."; exit 1; }
+command -v helm >/dev/null || { echo "ERROR: Helm is not installed."; exit 1; }
 
 echo "✓ All prerequisites found."
 
@@ -469,7 +470,12 @@ kubectl get ingress -A || true
 
 print_banner "Removing Snapshot Infrastructure"
 
-bash infrastructure/snapshot/uninstall.sh
+if [ -f infrastructure/snapshot/uninstall.sh ]; then
+    bash infrastructure/snapshot/uninstall.sh
+else
+    echo "Snapshot uninstall script not found. Skipping."
+fi
+
 echo "✓ Snapshot infrastructure removed."
 
 # --------------------------------------------------------------------
