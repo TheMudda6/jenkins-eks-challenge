@@ -19,7 +19,7 @@ cd "$TERRAFORM_DIR"
 # Environment Variables
 # --------------------------------------------------------------------
 
-ENV_FILE="$PROJECT_ROOT/.env"
+ENV_FILE="$TERRAFORM_DIR/.env"
 
 if [ -f "$ENV_FILE" ]; then
     set -a

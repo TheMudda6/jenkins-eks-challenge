@@ -22,7 +22,7 @@ cd "$TERRAFORM_DIR"
 # Load local environment variables required by Terraform providers.
 # --------------------------------------------------------------------
 
-ENV_FILE="$REPO_ROOT/.env"
+ENV_FILE="$TERRAFORM_DIR/.env"
 
 if [ -f "$ENV_FILE" ]; then
     set -a
