@@ -3,6 +3,10 @@ data "aws_iam_policy_document" "external_secrets_assume" {
   statement {
     effect = "Allow"
 
+    actions = [
+      "sts:AssumeRoleWithWebIdentity"
+    ]
+
     principals {
       type = "Federated"
 

@@ -132,10 +132,11 @@ echo "Creating Terraform execution plan..."
 
 echo "Checking Terraform Cloudflare token availability..."
 
-if terraform console <<< "var.cloudflare_api_token" >/dev/null 2>&1; then
-    echo "✓ Terraform variable available."
+if [ -n "${TF_VAR_cloudflare_api_token:-}" ]; then
+    echo "✓ Terraform Cloudflare token available."
 else
-    echo "WARNING: Terraform variable check failed."
+    echo "ERROR: Terraform Cloudflare token missing."
+    exit 1
 fi
 
 terraform plan -out=tfplan
@@ -388,7 +389,78 @@ echo "✓ Storage resources verified."
 #
 # Purpose:
 # Configure Kubernetes secret synchronization from AWS Secrets Manager.
+#
+# Note:
+# External Secrets Operator v2.x uses external-secrets.io/v1 API versions.
+# Manifests must match the installed CRD version.
 # --------------------------------------------------------------------
+
+print_banner "Installing External Secrets Operator"
+
+helm repo add external-secrets https://charts.external-secrets.io || true
+
+helm repo update
+
+helm upgrade --install external-secrets \
+  external-secrets/external-secrets \
+  --namespace external-secrets \
+  --create-namespace \
+  --set installCRDs=true
+
+echo "Waiting for External Secrets Operator..."
+
+kubectl wait \
+  --for=condition=Available \
+  deployment/external-secrets \
+  -n external-secrets \
+  --timeout=300s
+
+echo "✓ External Secrets Operator ready."
+
+
+# --------------------------------------------------------------------
+# External Secrets CRD Verification
+#
+# Purpose:
+# Ensure Kubernetes has registered External Secrets resources
+# before applying ClusterSecretStore and ExternalSecret objects.
+# --------------------------------------------------------------------
+
+echo
+echo "Waiting for External Secrets CRDs..."
+
+kubectl wait \
+  --for=condition=Established \
+  crd/externalsecrets.external-secrets.io \
+  --timeout=120s
+
+kubectl wait \
+  --for=condition=Established \
+  crd/clustersecretstores.external-secrets.io \
+  --timeout=120s
+
+echo "✓ External Secrets CRDs registered."
+
+echo
+echo "Refreshing Kubernetes API discovery..."
+
+kubectl api-resources >/dev/null
+
+echo "Verifying External Secrets resources..."
+
+if kubectl get crd externalsecrets.external-secrets.io >/dev/null 2>&1; then
+    echo "✓ ExternalSecret CRD available."
+else
+    echo "ERROR: ExternalSecret CRD not available."
+    exit 1
+fi
+
+if kubectl get crd clustersecretstores.external-secrets.io >/dev/null 2>&1; then
+    echo "✓ ClusterSecretStore CRD available."
+else
+    echo "ERROR: ClusterSecretStore CRD not available."
+    exit 1
+fi
 
 print_banner "Deploying External Secrets Configuration"
 

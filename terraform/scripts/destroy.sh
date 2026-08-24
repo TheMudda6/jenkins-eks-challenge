@@ -10,8 +10,7 @@ trap cleanup EXIT
 trap 'echo ""; echo "ERROR: Cleanup failed on line $LINENO"; exit 1' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+TERRAFORM_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$TERRAFORM_DIR"
 
@@ -175,7 +174,7 @@ echo "✓ Jenkins deployment deleted."
 # External Secrets Cleanup
 #
 # Purpose:
-# Remove External Secrets resources before deleting PostgreSQL.
+# Remove External Secrets resources before removing the operator.
 # --------------------------------------------------------------------
 
 print_banner "Removing External Secrets"
@@ -200,13 +199,40 @@ echo "✓ ClusterSecretStore deleted."
 
 
 echo
-echo "Verifying generated Kubernetes Secret removal..."
+echo "Deleting generated Kubernetes Secret..."
 
 kubectl delete secret postgres-secret \
     -n "$NAMESPACE" \
     --ignore-not-found=true
 
 echo "✓ PostgreSQL Kubernetes Secret deleted."
+
+
+# --------------------------------------------------------------------
+# External Secrets Operator Cleanup
+#
+# Purpose:
+# Remove External Secrets Operator after dependent resources are gone.
+# --------------------------------------------------------------------
+
+print_banner "Removing External Secrets Operator"
+
+echo "Deleting External Secrets Operator Helm release..."
+
+helm uninstall external-secrets \
+    -n external-secrets \
+    --ignore-not-found || true
+
+echo "✓ External Secrets Operator Helm release removed."
+
+
+echo
+echo "Waiting for External Secrets namespace cleanup..."
+
+kubectl delete namespace external-secrets \
+    --ignore-not-found=true
+
+echo "✓ External Secrets namespace removed."
 
 # --------------------------------------------------------------------
 # PostgreSQL Cleanup
