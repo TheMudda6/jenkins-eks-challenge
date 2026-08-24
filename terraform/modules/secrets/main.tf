@@ -1,6 +1,8 @@
 resource "aws_secretsmanager_secret" "postgres" {
   name = "jenkins/postgres"
 
+  recovery_window_in_days = 0
+
   tags = {
     Name        = "postgres-secret"
     Project     = "jenkins-eks"
