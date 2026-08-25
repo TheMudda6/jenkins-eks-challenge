@@ -325,6 +325,30 @@ kubectl wait \
 echo "✓ AWS Load Balancer Controller is ready."
 
 echo
+echo "Waiting for AWS Load Balancer webhook endpoint..."
+
+ALB_WEBHOOK_TIMEOUT=300
+ALB_WEBHOOK_ELAPSED=0
+
+until kubectl get endpoints \
+aws-load-balancer-webhook-service \
+-n kube-system \
+-o jsonpath='{.subsets[*].addresses[*].ip}' | grep -q .; do
+
+    if [ "$ALB_WEBHOOK_ELAPSED" -ge "$ALB_WEBHOOK_TIMEOUT" ]; then
+        echo "ERROR: AWS Load Balancer webhook did not become ready."
+        exit 1
+    fi
+
+    echo "Waiting for AWS Load Balancer webhook..."
+    sleep 10
+    ALB_WEBHOOK_ELAPSED=$((ALB_WEBHOOK_ELAPSED + 10))
+
+done
+
+echo "✓ AWS Load Balancer webhook is ready."
+
+echo
 echo "Verifying Amazon EBS CSI Driver..."
 
 kubectl wait \
