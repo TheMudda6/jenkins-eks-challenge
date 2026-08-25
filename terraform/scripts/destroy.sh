@@ -451,6 +451,31 @@ kubectl get sa application-sa -n "$NAMESPACE" || true
 echo
 echo "✓ Application cleanup complete."
 
+# --------------------------------------------------------------------
+# Monitoring Cleanup
+#
+# Purpose:
+# Remove Prometheus/Grafana ArgoCD Application before cluster teardown.
+# --------------------------------------------------------------------
+
+print_banner "Removing Monitoring"
+
+echo "Deleting Monitoring ArgoCD Application..."
+
+kubectl delete application monitoring \
+    -n argocd \
+    --ignore-not-found=true
+
+echo "✓ Monitoring ArgoCD Application deleted."
+
+echo
+echo "Deleting Monitoring namespace..."
+
+kubectl delete namespace monitoring \
+    --ignore-not-found=true
+
+echo "✓ Monitoring namespace removed."
+
 echo "Deleting Jenkins PVC..."
 kubectl delete -f infrastructure/jenkins/jenkins-pvc.yaml --ignore-not-found=true
 echo "✓ Jenkins PVC deleted."
