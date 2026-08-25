@@ -629,8 +629,12 @@ echo "Snapshot Controller:"
 kubectl get deployment snapshot-controller -n kube-system 2>/dev/null || echo "✓ Snapshot Controller removed."
 
 echo
-echo "Snapshot CRDs:"
-kubectl get crd | grep snapshot || true
+if kubectl cluster-info >/dev/null 2>&1; then
+    echo "Snapshot CRDs:"
+    kubectl get crd | grep snapshot || true
+else
+    echo "✓ Cluster removed; skipping Kubernetes CRD verification."
+fi
 
 echo "✓ Snapshot CRD verification complete."
 
