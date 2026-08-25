@@ -1,0 +1,47 @@
+name: Validate Infrastructure
+
+on:
+  pull_request:
+  push:
+    branches:
+      - stable-v1.31
+
+jobs:
+  terraform:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format Check
+        run:
+          terraform fmt -check -recursive terraform
+
+      - name: Terraform Init
+        working-directory: terraform
+        run:
+          terraform init -backend=false
+
+      - name: Terraform Validate
+        working-directory: terraform
+        run:
+          terraform validate
+
+  shell:
+    name: Shell Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run:
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Check Scripts
+        run:
+          shellcheck terraform/scripts/*.sh
