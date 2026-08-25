@@ -1,0 +1,94 @@
+services:
+
+  postgres:
+    image: postgres:16.9
+    container_name: jenkins-postgres-local
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orders"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  redis:
+    image: redis:8.2
+    container_name: jenkins-redis-local
+    ports:
+      - "6379:6379"
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: jenkins-localstack
+
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: eu-west-2
+
+    ports:
+      - "4566:4566"
+
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - ./terraform/scripts/localstack-init.sh:/etc/localstack/init/ready.d/init.sh
+
+    healthcheck:
+      test:
+        [
+        "CMD-SHELL",
+        "awslocal sqs list-queues"
+      ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  application:
+    build:
+      context: ./application
+    container_name: jenkins-api-local
+    environment:
+      PORT: 8080
+
+      AWS_REGION: eu-west-2
+      QUEUE_URL: http://localstack:4566/000000000000/orders
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: orders
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    ports:
+      - "8080:8080"
+
+
+volumes:
+
+  postgres-data:
+
+  localstack-data:
