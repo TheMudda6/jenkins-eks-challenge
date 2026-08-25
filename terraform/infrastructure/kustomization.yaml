@@ -5,3 +5,4 @@ resources:
   - redis
   - storage
   - secrets
+  - monitoring

@@ -1,0 +1,26 @@
+name: Kubernetes Manifest Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - stable-v1.31
+
+jobs:
+  validate-manifests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check External Secrets API version
+        run: |
+          if grep -R "external-secrets.io/v1beta1" terraform/infrastructure; then
+            echo "Old External Secrets API detected"
+            exit 1
+          fi
+
+      - name: Validate Kubernetes YAML
+        uses: instrumenta/kubeval-action@master
+        with:
+          files: terraform/infrastructure
