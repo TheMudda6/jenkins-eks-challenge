@@ -134,10 +134,8 @@ echo "Deleting Jenkins ArgoCD Application..."
 kubectl delete application jenkins-application \
   -n argocd \
   --ignore-not-found=true
-
-echo "✓ Jenkins ArgoCD Application deleted."
-
-echo "Waiting for Jenkins ArgoCD Application to be removed..."
+  
+echo "Waiting for ArgoCD managed workloads to release..."
 
 kubectl wait \
   --for=delete \
@@ -159,16 +157,6 @@ kubectl wait \
     ingress/jenkins-ingress \
     -n "$NAMESPACE" \
     --timeout=300s || true
-
-echo "✓ Jenkins Ingress removed."
-
-echo "Deleting Jenkins service..."
-kubectl delete -f infrastructure/jenkins/jenkins-service.yaml --ignore-not-found=true
-echo "✓ Jenkins service deleted."
-
-echo "Deleting Jenkins deployment..."
-kubectl delete -f infrastructure/jenkins/jenkins-deployment.yaml --ignore-not-found=true
-echo "✓ Jenkins deployment deleted."
 
 # --------------------------------------------------------------------
 # External Secrets Cleanup
@@ -240,27 +228,6 @@ echo "✓ External Secrets namespace removed."
 # Purpose:
 # Remove PostgreSQL resources before deleting the namespace.
 # --------------------------------------------------------------------
-
-print_banner "Removing PostgreSQL"
-
-echo "Deleting PostgreSQL StatefulSet..."
-
-kubectl delete \
-    -f infrastructure/postgres/postgres-statefulset.yaml \
-    --ignore-not-found=true
-
-echo "✓ PostgreSQL StatefulSet deleted."
-
-echo
-echo "Waiting for PostgreSQL StatefulSet to terminate..."
-
-kubectl wait \
-    --for=delete \
-    statefulset/postgres \
-    -n "$NAMESPACE" \
-    --timeout=300s || true
-
-echo "✓ PostgreSQL StatefulSet removed."
 
 echo
 echo "Verifying PostgreSQL Pods..."
@@ -340,25 +307,6 @@ echo "✓ PostgreSQL Service deleted."
 
 print_banner "Removing Redis"
 
-echo "Deleting Redis Deployment..."
-
-kubectl delete \
-    -f infrastructure/redis/redis-deployment.yaml \
-    --ignore-not-found=true
-
-echo "✓ Redis Deployment deleted."
-
-echo
-echo "Waiting for Redis Deployment to terminate..."
-
-kubectl wait \
-    --for=delete \
-    deployment/redis \
-    -n "$NAMESPACE" \
-    --timeout=300s || true
-
-echo "✓ Redis Deployment removed."
-
 echo
 echo "Deleting Redis Service..."
 
@@ -384,74 +332,6 @@ echo
 echo "✓ Redis cleanup complete."
 
 # --------------------------------------------------------------------
-# Application Cleanup
-#
-# Purpose:
-# Remove the application resources before deleting the namespace.
-# --------------------------------------------------------------------
-
-print_banner "Removing Application"
-
-echo "Deleting Application Service..."
-
-kubectl delete \
-    -f infrastructure/application/application-service.yaml \
-    --ignore-not-found=true
-
-echo "✓ Application Service deleted."
-
-echo
-echo "Deleting Application Deployment..."
-
-kubectl delete \
-    -f infrastructure/application/application-deployment.yaml \
-    --ignore-not-found=true
-
-echo "✓ Application Deployment deleted."
-
-echo
-echo "Waiting for Application Deployment to terminate..."
-
-kubectl wait \
-    --for=delete \
-    deployment/application \
-    -n "$NAMESPACE" \
-    --timeout=300s || true
-
-echo "✓ Application Deployment removed."
-
-echo
-echo "Deleting Application Service Account..."
-
-kubectl delete \
-    -f infrastructure/application/application-serviceaccount.yaml \
-    --ignore-not-found=true
-
-echo "✓ Application Service Account deleted."
-
-echo
-echo "Application resources:"
-
-echo
-echo "Application Pods:"
-kubectl get pods -l app=application -n "$NAMESPACE" || true
-
-echo
-echo "Application Service:"
-kubectl get svc application -n "$NAMESPACE" || true
-
-echo
-echo "Application Deployment:"
-kubectl get deployment application -n "$NAMESPACE" || true
-
-echo
-echo "Application Service Account:"
-kubectl get sa application-sa -n "$NAMESPACE" || true
-
-echo
-echo "✓ Application cleanup complete."
-
-# --------------------------------------------------------------------
 # Monitoring Cleanup
 #
 # Purpose:
@@ -467,6 +347,12 @@ kubectl delete application monitoring \
     --ignore-not-found=true
 
 echo "✓ Monitoring ArgoCD Application deleted."
+
+echo "Waiting for Monitoring resources to release..."
+
+sleep 30
+
+echo "✓ Monitoring resources released."
 
 echo
 echo "Deleting Monitoring namespace..."

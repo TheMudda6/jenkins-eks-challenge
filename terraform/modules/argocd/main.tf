@@ -9,13 +9,3 @@ resource "helm_release" "argocd" {
   version = var.chart_version
 
 }
-
-resource "helm_release" "jenkins_application" {
-  name      = "jenkins-application"
-  chart     = "${path.module}/jenkins-application"
-  namespace = var.namespace
-
-  depends_on = [
-    helm_release.argocd
-  ]
-}

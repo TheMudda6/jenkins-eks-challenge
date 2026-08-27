@@ -3,6 +3,5 @@ resources:
   - jenkins
   - postgres
   - redis
-  - storage
   - secrets
   - monitoring
