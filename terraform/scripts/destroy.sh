@@ -229,6 +229,25 @@ echo "✓ External Secrets namespace removed."
 # Remove PostgreSQL resources before deleting the namespace.
 # --------------------------------------------------------------------
 
+echo "Deleting PostgreSQL StatefulSet..."
+
+kubectl delete \
+    -f infrastructure/postgres/postgres-statefulset.yaml \
+    --ignore-not-found=true
+
+echo "✓ PostgreSQL StatefulSet deleted."
+
+echo
+echo "Waiting for PostgreSQL StatefulSet to terminate..."
+
+kubectl wait \
+    --for=delete \
+    statefulset/postgres \
+    -n "$NAMESPACE" \
+    --timeout=300s || true
+
+echo "✓ PostgreSQL StatefulSet removed."
+
 echo
 echo "Verifying PostgreSQL Pods..."
 
@@ -331,6 +350,34 @@ echo
 
 echo "✓ Redis cleanup complete."
 
+echo "Deleting Jenkins Deployment..."
+
+kubectl delete \
+    -f infrastructure/jenkins/jenkins-deployment.yaml \
+    --ignore-not-found=true
+
+echo "✓ Jenkins Deployment deleted."
+
+echo
+echo "Deleting Jenkins PVC..."
+
+kubectl delete \
+    -f infrastructure/jenkins/jenkins-pvc.yaml \
+    --ignore-not-found=true
+
+echo "✓ Jenkins PVC deletion requested."
+
+echo
+echo "Waiting for Jenkins PVC removal..."
+
+kubectl wait \
+    --for=delete \
+    pvc/jenkins-pvc \
+    -n "$NAMESPACE" \
+    --timeout=300s || true
+
+echo "✓ Jenkins PVC removed."
+
 # --------------------------------------------------------------------
 # Monitoring Cleanup
 #
@@ -361,10 +408,6 @@ kubectl delete namespace monitoring \
     --ignore-not-found=true
 
 echo "✓ Monitoring namespace removed."
-
-echo "Deleting Jenkins PVC..."
-kubectl delete -f infrastructure/jenkins/jenkins-pvc.yaml --ignore-not-found=true
-echo "✓ Jenkins PVC deleted."
 
 echo
 echo "Remaining External Secrets:"
