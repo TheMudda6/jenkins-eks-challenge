@@ -79,7 +79,7 @@ variable "max_size" {
 variable "instance_type" {
   description = "The EC2 instance type for the EKS worker nodes."
   type        = string
-  default     = "t3.small"
+  default     = "t3.large"
 }
 
 variable "ebs_csi_driver_role_arn" {
