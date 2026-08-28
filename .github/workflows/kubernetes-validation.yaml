@@ -1,3 +1,14 @@
+# --------------------------------------------------------------------
+# Kubernetes Manifest Validation Workflow
+#
+# Purpose:
+# Validate Kubernetes manifests automatically through GitHub Actions.
+#
+# This workflow verifies that deprecated External Secrets API versions
+# are not present and validates the Kubernetes manifests before changes
+# are merged.
+# --------------------------------------------------------------------
+
 name: Kubernetes Manifest Validation
 
 on:

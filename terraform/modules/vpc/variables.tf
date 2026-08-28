@@ -1,8 +1,13 @@
 # -----------------------------------------------------------------------------
-# VPC Name
+#
+# VPC Module Variables
 #
 # Purpose:
-# Defines the name assigned to the Virtual Private Cloud.
+# Defines the configuration inputs required by the VPC module.
+#
+# These variables control the VPC address space, Availability Zones,
+# public and private subnet configuration, and common resource tagging.
+#
 # -----------------------------------------------------------------------------
 
 variable "vpc_name" {

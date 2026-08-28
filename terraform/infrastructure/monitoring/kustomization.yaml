@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Monitoring Kustomization
+#
+# Purpose:
+# Defines the Kubernetes resources required to deploy the monitoring platform.
+#
+# Kustomize uses this file as the entry point for the monitoring namespace
+# and the ArgoCD Application that manages the Prometheus stack.
+# -----------------------------------------------------------------------------
+
 resources:
   - namespace.yaml
   - prometheus-stack.yaml

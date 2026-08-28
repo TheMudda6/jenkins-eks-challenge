@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Jenkins VolumeSnapshot
+#
+# Purpose:
+# Defines a point-in-time snapshot of the Jenkins PersistentVolumeClaim.
+#
+# The snapshot provides a recovery point for Jenkins persistent data and
+# can be used as part of the platform's disaster-recovery workflow.
+# -----------------------------------------------------------------------------
+
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 

@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Application Service
+#
+# Purpose:
+# Exposes the application internally within the Kubernetes cluster.
+#
+# The ClusterIP Service provides stable service discovery for other workloads
+# without exposing the application directly to the public internet.
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Service
 

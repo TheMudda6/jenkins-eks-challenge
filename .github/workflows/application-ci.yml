@@ -1,3 +1,15 @@
+# --------------------------------------------------------------------
+# Application CI and Container Build Workflow
+#
+# Purpose:
+# Build, test and publish the application container automatically
+# through GitHub Actions.
+#
+# This workflow compiles and tests the Go application, authenticates
+# to AWS using GitHub Actions OIDC, builds the Docker image and
+# publishes versioned and latest images to Amazon ECR.
+# --------------------------------------------------------------------
+
 name: Application CI
 
 on:

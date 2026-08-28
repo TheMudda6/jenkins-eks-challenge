@@ -1,3 +1,14 @@
+# --------------------------------------------------------------------
+# Infrastructure Validation Workflow
+#
+# Purpose:
+# Validate Terraform configuration and shell scripts automatically
+# through GitHub Actions.
+#
+# This workflow checks Terraform formatting and configuration validity
+# and runs ShellCheck against deployment and cleanup scripts.
+# --------------------------------------------------------------------
+
 name: Validate Infrastructure
 
 on:

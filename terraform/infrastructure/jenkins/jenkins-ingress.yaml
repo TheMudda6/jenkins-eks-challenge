@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Jenkins Ingress
+#
+# Purpose:
+# Exposes Jenkins to the internet through an AWS Application Load Balancer.
+#
+# The Ingress configures an internet-facing ALB with HTTP and HTTPS listeners,
+# TLS termination using an ACM certificate, and HTTP-to-HTTPS redirection.
+# -----------------------------------------------------------------------------
+
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

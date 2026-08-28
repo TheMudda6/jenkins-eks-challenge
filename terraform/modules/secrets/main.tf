@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+#
+# AWS Secrets Manager
+#
+# Purpose:
+# Creates the AWS Secrets Manager secret used to securely store the
+# PostgreSQL credentials required by the Jenkins platform.
+#
+# -----------------------------------------------------------------------------
+
 resource "aws_secretsmanager_secret" "postgres" {
   name = "jenkins/postgres"
 

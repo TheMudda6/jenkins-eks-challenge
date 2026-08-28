@@ -1,3 +1,16 @@
+# -----------------------------------------------------------------------------
+# Volume Snapshot Infrastructure Installation
+#
+# Purpose:
+# Installs the Kubernetes Volume Snapshot infrastructure required to create
+# and manage Amazon EBS-backed VolumeSnapshots.
+#
+# The script installs the VolumeSnapshot CRDs, Snapshot Controller RBAC,
+# Snapshot Controller deployment and the platform's VolumeSnapshotClass.
+#
+# This infrastructure is required by the Jenkins disaster-recovery workflow.
+# -----------------------------------------------------------------------------
+
 echo "Installing Volume Snapshot CRDs..."
 
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/release-8.2/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml

@@ -1,4 +1,17 @@
 # -----------------------------------------------------------------------------
+#
+# IAM Module Variables
+#
+# Purpose:
+# Defines the configuration inputs required by the IAM module.
+#
+# These variables control the IAM roles, policies and trust relationships
+# used by Amazon EKS, Kubernetes controllers, the application and GitHub
+# Actions.
+#
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 # Node Group Role Name
 #
 # Purpose:

@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+#
+# External Secrets IAM Policy
+#
+# Purpose:
+# Defines the IAM permissions required by External Secrets Operator to
+# retrieve PostgreSQL credentials from AWS Secrets Manager.
+#
+# -----------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "external_secrets" {
   statement {
     effect = "Allow"

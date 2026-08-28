@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Monitoring Namespace
+#
+# Purpose:
+# Provides an isolated Kubernetes namespace for the monitoring stack.
+#
+# Prometheus, Grafana and Alertmanager resources are deployed into this
+# namespace to separate observability workloads from the application platform.
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Namespace
 metadata:

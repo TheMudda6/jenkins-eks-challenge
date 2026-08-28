@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+#
+# SQS Module Outputs
+#
+# Purpose:
+# Exposes the orders queue URL, ARN and name for use by other
+# Terraform modules and application configuration.
+#
+# -----------------------------------------------------------------------------
+
 output "queue_url" {
   description = "URL of the orders queue"
   value       = aws_sqs_queue.orders.url

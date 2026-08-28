@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Jenkins Deployment
+#
+# Purpose:
+# Deploys the Jenkins controller workload into the Jenkins namespace.
+#
+# The Deployment mounts persistent storage for Jenkins home and configures
+# the security context required for Jenkins to access its data.
+# -----------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 

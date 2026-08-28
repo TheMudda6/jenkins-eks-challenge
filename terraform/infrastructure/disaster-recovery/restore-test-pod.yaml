@@ -1,3 +1,14 @@
+# -----------------------------------------------------------------------------
+# Jenkins Restore Test Pod
+#
+# Purpose:
+# Provides a temporary workload for validating that restored Jenkins storage
+# can be successfully mounted and accessed by a Kubernetes Pod.
+#
+# The Pod mounts the restored PersistentVolumeClaim at /data and remains
+# running long enough for manual verification.
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Pod
 

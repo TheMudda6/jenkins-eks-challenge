@@ -1,3 +1,14 @@
+# -----------------------------------------------------------------------------
+# Terraform Providers
+#
+# Purpose:
+# Configures the Terraform providers required to manage AWS, Kubernetes/Helm
+# and Cloudflare resources used by the Jenkins EKS platform.
+#
+# Kubernetes access is configured through the EKS cluster endpoint and AWS
+# authentication so Terraform can manage Helm releases after the cluster exists.
+# -----------------------------------------------------------------------------
+
 terraform {
   required_version = ">= 1.5.0"
 

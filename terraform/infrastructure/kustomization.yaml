@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Infrastructure Kustomization
+#
+# Purpose:
+# Defines the Kubernetes resources managed by Kustomize for the platform.
+#
+# Kustomize uses this file as the top-level entry point for the application,
+# Jenkins, PostgreSQL, Redis, secrets and monitoring resources.
+# -----------------------------------------------------------------------------
+
 resources:
   - application
   - jenkins

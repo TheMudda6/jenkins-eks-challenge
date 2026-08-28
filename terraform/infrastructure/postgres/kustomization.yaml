@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# PostgreSQL Kustomization
+#
+# Purpose:
+# Defines the Kubernetes resources required to deploy PostgreSQL.
+#
+# Kustomize uses this file as the entry point for the PostgreSQL Service and
+# StatefulSet resources.
+# -----------------------------------------------------------------------------
+
 resources:
   - postgres-service.yaml
   - postgres-statefulset.yaml

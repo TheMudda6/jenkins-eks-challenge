@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Kubernetes Helm Releases
+#
+# Purpose:
+# Installs Kubernetes infrastructure components required by the platform
+# through Helm after the EKS cluster has been provisioned.
+#
+# This includes the AWS Load Balancer Controller and External Secrets Operator.
+# -----------------------------------------------------------------------------
+
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"

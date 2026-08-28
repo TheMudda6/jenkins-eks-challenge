@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Application Kustomization
+#
+# Purpose:
+# Defines the Kubernetes resources that make up the application workload.
+#
+# Kustomize uses this file as the entry point for deploying the application
+# Deployment, Service and Service Account as a single resource group.
+# -----------------------------------------------------------------------------
+
 resources:
   - application-deployment.yaml
   - application-service.yaml

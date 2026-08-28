@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+#
+# External Secrets IAM Trust Policy
+#
+# Purpose:
+# Defines the trust relationship that allows the External Secrets Operator
+# Kubernetes Service Account to assume its IAM Role using EKS OIDC and IRSA.
+#
+# -----------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "external_secrets_assume" {
 
   statement {

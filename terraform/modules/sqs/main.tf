@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+#
+# Amazon SQS Queues
+#
+# Purpose:
+# Creates the application orders queue and its dead-letter queue (DLQ)
+# for reliable asynchronous message processing.
+#
+# -----------------------------------------------------------------------------
+
 resource "aws_sqs_queue" "orders_dlq" {
 
   name = "${var.project_name}-${var.environment}-orders-dlq"

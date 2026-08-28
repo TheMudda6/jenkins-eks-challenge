@@ -1,4 +1,12 @@
-# Restoring a PVC from a VolumeSnapshot
+# -----------------------------------------------------------------------------
+# Jenkins Restore PersistentVolumeClaim
+#
+# Purpose:
+# Creates a new PersistentVolumeClaim from the Jenkins VolumeSnapshot.
+#
+# This resource demonstrates how Jenkins persistent storage can be restored
+# from a previously created EBS-backed VolumeSnapshot.
+# -----------------------------------------------------------------------------
 
 apiVersion: v1
 kind: PersistentVolumeClaim

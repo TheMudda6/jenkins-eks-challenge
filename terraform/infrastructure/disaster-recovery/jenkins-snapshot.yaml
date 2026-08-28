@@ -1,4 +1,12 @@
-# Jenkins Snapshot
+# -----------------------------------------------------------------------------
+# Jenkins Restore PersistentVolumeClaim
+#
+# Purpose:
+# Creates a new PersistentVolumeClaim from the Jenkins VolumeSnapshot.
+#
+# This resource demonstrates how Jenkins persistent storage can be restored
+# from a previously created EBS-backed VolumeSnapshot.
+# -----------------------------------------------------------------------------
 
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot

@@ -1,9 +1,22 @@
+# -----------------------------------------------------------------------------
+# GP3 Retain StorageClass
+#
+# Purpose:
+# Defines a Kubernetes StorageClass for dynamically provisioning encrypted
+# Amazon EBS gp3 volumes that should survive PersistentVolumeClaim deletion.
+#
+# The Retain reclaim policy preserves the underlying EBS volume when its
+# PersistentVolumeClaim is deleted, allowing the data to be recovered later.
+#
+# Volume provisioning is delayed until a workload is scheduled so that the
+# EBS volume is created in an appropriate Availability Zone.
+# -----------------------------------------------------------------------------
+
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 
 metadata:
   name: gp3-retain
-  annotations:
     
 
 provisioner: ebs.csi.aws.com

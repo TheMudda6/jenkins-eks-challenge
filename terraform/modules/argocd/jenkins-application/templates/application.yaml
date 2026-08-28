@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+#
+# Jenkins ArgoCD Application
+#
+# Purpose:
+# Defines the ArgoCD Application responsible for deploying and continuously
+# synchronizing the Jenkins platform from the project's Git repository.
+#
+# -----------------------------------------------------------------------------
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 

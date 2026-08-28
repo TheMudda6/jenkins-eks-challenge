@@ -2,11 +2,11 @@
 # PostgreSQL Headless Service
 #
 # Purpose:
-# Provides stable network identities for PostgreSQL StatefulSet pods.
+# Provides stable network identity and DNS discovery for the PostgreSQL
+# StatefulSet.
 #
-# Unlike a normal Service, a headless Service does not load balance traffic.
-# Instead, it allows each StatefulSet pod to be reached individually using
-# predictable DNS names.
+# The headless Service uses clusterIP: None so PostgreSQL can be addressed
+# directly by its stable StatefulSet DNS identity.
 # -----------------------------------------------------------------------------
 
 apiVersion: v1

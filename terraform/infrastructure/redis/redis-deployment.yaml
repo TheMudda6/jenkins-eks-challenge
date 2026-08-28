@@ -4,6 +4,9 @@
 # Purpose:
 # Deploys a single Redis Pod to provide fast in-memory caching
 # for the application.
+#
+# Redis is deployed as a Kubernetes workload within the Jenkins namespace
+# and is accessed internally through the Redis Service.
 # -----------------------------------------------------------------------------
 
 apiVersion: apps/v1

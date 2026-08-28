@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+#
+# Secrets Module Outputs
+#
+# Purpose:
+# Exposes the PostgreSQL secret name and ARN for use by dependent
+# Terraform modules and Kubernetes secret integration.
+#
+# -----------------------------------------------------------------------------
+
 output "postgres_secret_name" {
   value = aws_secretsmanager_secret.postgres.name
 }

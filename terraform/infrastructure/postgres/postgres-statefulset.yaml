@@ -2,7 +2,13 @@
 # PostgreSQL StatefulSet
 #
 # Purpose:
-# Manages a set of identical pods with stable network identities and persistent storage.
+# Deploys PostgreSQL as a stateful Kubernetes workload with persistent storage.
+#
+# The StatefulSet provides a stable network identity and persistent EBS-backed
+# storage for the PostgreSQL database used by the application.
+#
+# Database credentials are supplied through the Kubernetes Secret generated
+# from the project's external secret management configuration.
 # -----------------------------------------------------------------------------
 
 apiVersion: apps/v1

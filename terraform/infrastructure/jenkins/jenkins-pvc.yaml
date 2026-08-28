@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+# Jenkins Persistent Volume Claim
+#
+# Purpose:
+# Provides persistent storage for the Jenkins controller.
+#
+# The PVC requests a 10Gi Amazon EBS-backed volume using the gp3 StorageClass,
+# ensuring Jenkins data survives pod recreation.
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

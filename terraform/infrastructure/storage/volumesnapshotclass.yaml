@@ -1,3 +1,14 @@
+# -----------------------------------------------------------------------------
+# EBS VolumeSnapshotClass
+#
+# Purpose:
+# Defines the VolumeSnapshotClass used by the Amazon EBS CSI Driver
+# to create Kubernetes volume snapshots.
+#
+# Snapshots use a Retain deletion policy so that snapshot data is preserved
+# even if the corresponding Kubernetes VolumeSnapshot resource is deleted.
+# -----------------------------------------------------------------------------
+
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
 

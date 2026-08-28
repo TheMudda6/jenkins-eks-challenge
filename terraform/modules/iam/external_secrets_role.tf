@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------
+#
+# External Secrets IAM Role
+#
+# Purpose:
+# Creates and attaches the IAM Role used by External Secrets Operator to
+# access secrets stored in AWS Secrets Manager.
+#
+# -----------------------------------------------------------------------------
+
 resource "aws_iam_role" "external_secrets" {
   name = "jenkins-external-secrets-role"
 

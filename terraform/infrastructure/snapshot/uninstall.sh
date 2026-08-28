@@ -1,3 +1,15 @@
+# -----------------------------------------------------------------------------
+# Volume Snapshot Infrastructure Uninstallation
+#
+# Purpose:
+# Removes the Kubernetes Volume Snapshot infrastructure installed by
+# install.sh.
+#
+# The script removes the platform VolumeSnapshotClass, Snapshot Controller,
+# associated RBAC resources and VolumeSnapshot CRDs, then verifies that the
+# snapshot infrastructure has been removed.
+# -----------------------------------------------------------------------------
+
 echo "Removing VolumeSnapshotClass..."
 
 kubectl delete -f infrastructure/storage/volumesnapshotclass.yaml \

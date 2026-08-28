@@ -1,3 +1,16 @@
+# -----------------------------------------------------------------------------
+# Application Deployment
+#
+# Purpose:
+# Deploys the application workload into the Jenkins namespace.
+#
+# Configures the application container, environment variables, PostgreSQL
+# connectivity, health probes and resource requirements.
+#
+# AWS access is provided through the application Service Account using
+# IAM Roles for Service Accounts (IRSA).
+# -----------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 

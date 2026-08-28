@@ -4,6 +4,9 @@
 # Purpose:
 # Provides stable network access to the Redis Deployment
 # from within the Kubernetes cluster.
+#
+# The ClusterIP Service exposes Redis on its standard port and allows
+# application workloads to discover Redis through Kubernetes DNS.
 # -----------------------------------------------------------------------------
 
 apiVersion: v1
