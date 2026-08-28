@@ -188,3 +188,16 @@ module "secrets" {
 
   postgres_password = var.postgres_password
 }
+
+# -----------------------------------------------------------------------------
+# Karpenter Module
+#
+# Purpose:
+# Creates the AWS IAM resources required by Karpenter-provisioned nodes.
+# -----------------------------------------------------------------------------
+
+module "karpenter" {
+  source = "./modules/karpenter"
+
+  cluster_name = var.cluster_name
+}
