@@ -125,10 +125,6 @@ module "argocd" {
 
   namespace     = "argocd"
   chart_version = var.argocd_chart_version
-
-  repository_url   = "https://github.com/TheMudda6/jenkins-eks-challenge.git"
-  target_revision  = "stable-v1.31"
-  application_path = "terraform/infrastructure"
 }
 
 # -----------------------------------------------------------------------------
