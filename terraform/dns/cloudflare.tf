@@ -1,13 +1,14 @@
 # -----------------------------------------------------------------------------
-# Cloudflare DNS Configuration
+# Cloudflare Jenkins DNS
 #
 # Purpose:
-# Creates the public DNS record used to access Jenkins through the AWS
-# Application Load Balancer.
+# Creates the public Jenkins CNAME pointing at the AWS Application Load
+# Balancer created by the Kubernetes Ingress.
 #
-# The ALB hostname is supplied after the Kubernetes Ingress is created, allowing
-# Terraform to create the Cloudflare CNAME record dynamically.
+# The ALB hostname is supplied dynamically by deploy.sh after the Ingress
+# becomes ready.
 # -----------------------------------------------------------------------------
+
 data "cloudflare_zone" "main" {
   filter = {
     name = var.cloudflare_zone_name
@@ -15,8 +16,6 @@ data "cloudflare_zone" "main" {
 }
 
 resource "cloudflare_dns_record" "jenkins" {
-  count = var.alb_hostname != "" ? 1 : 0
-
   zone_id = data.cloudflare_zone.main.id
   name    = var.jenkins_hostname
   type    = "CNAME"

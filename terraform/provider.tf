@@ -26,11 +26,6 @@ terraform {
       version = "~> 2.13"
     }
 
-    cloudflare = {
-      source  = "cloudflare/cloudflare"
-      version = "~> 5.22"
-    }
-
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.30"
@@ -72,8 +67,4 @@ provider "kubernetes" {
       module.eks.cluster_name
     ]
   }
-}
-
-provider "cloudflare" {
-  api_token = var.cloudflare_api_token
 }

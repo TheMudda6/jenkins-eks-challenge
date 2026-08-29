@@ -659,16 +659,19 @@ print_banner "Configuring Cloudflare DNS"
 
 echo "Creating Terraform plan for Cloudflare DNS..."
 
-terraform plan \
-  -var="alb_hostname=$ALB_HOSTNAME" \
-  -out=dns.tfplan
+terraform -chdir="$TERRAFORM_DIR/dns" plan \
+    -var="cloudflare_zone_name=mud-as-sir.uk" \
+    -var="jenkins_hostname=jenkins.mud-as-sir.uk" \
+    -var="alb_hostname=$ALB_HOSTNAME" \
+    -out=dns.tfplan
 
 echo "✓ Cloudflare DNS plan created."
 
 echo "Applying Cloudflare DNS plan..."
 
-terraform apply dns.tfplan
+terraform -chdir="$TERRAFORM_DIR/dns" apply dns.tfplan
 
+echo "✓ Cloudflare DNS configured."
 
 echo
 echo "ArgoCD Application status:"

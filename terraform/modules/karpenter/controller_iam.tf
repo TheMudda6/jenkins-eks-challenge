@@ -73,6 +73,7 @@ data "aws_iam_policy_document" "controller" {
       "ec2:DescribeImages",
       "ec2:DescribeInstanceTypeOfferings",
       "ec2:DescribeInstanceTypes",
+      "ec2:DescribeInstances",
       "ec2:DescribeLaunchTemplates",
       "ec2:DescribeSecurityGroups",
       "ec2:DescribeSpotPriceHistory",
@@ -140,7 +141,8 @@ data "aws_iam_policy_document" "controller" {
       "iam:AddRoleToInstanceProfile",
       "iam:RemoveRoleFromInstanceProfile",
       "iam:TagInstanceProfile",
-      "iam:ListInstanceProfiles"
+      "iam:ListInstanceProfiles",
+      "iam:GetInstanceProfile"
     ]
 
     resources = ["*"]
