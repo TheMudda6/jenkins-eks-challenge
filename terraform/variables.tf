@@ -320,3 +320,12 @@ variable "alb_hostname" {
   type        = string
   default     = ""
 }
+
+# -----------------------------------------------------------------------------
+# Karpenter Configuration
+# -----------------------------------------------------------------------------
+
+variable "karpenter_chart_version" {
+  description = "Karpenter Helm chart version."
+  type        = string
+}

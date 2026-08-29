@@ -49,3 +49,8 @@ variable "owner" {
   description = "Project owner used for resource tagging."
   type        = string
 }
+
+variable "cluster_name" {
+  description = "Name of the EKS cluster used for Karpenter resource discovery."
+  type        = string
+}

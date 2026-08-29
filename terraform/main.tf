@@ -19,6 +19,7 @@ module "vpc" {
   private_subnets    = var.private_subnets
   public_subnets     = var.public_subnets
 
+
   # ---------------------------------------------------------------------------
   # Project Configuration
   # ---------------------------------------------------------------------------
@@ -26,6 +27,9 @@ module "vpc" {
   environment  = var.environment
   project_name = var.project_name
   owner        = var.owner
+
+  cluster_name = var.cluster_name
+
 }
 
 # -----------------------------------------------------------------------------
@@ -190,14 +194,23 @@ module "secrets" {
 }
 
 # -----------------------------------------------------------------------------
+#
 # Karpenter Module
 #
 # Purpose:
-# Creates the AWS IAM resources required by Karpenter-provisioned nodes.
+# Installs Karpenter and creates the IAM resources required for dynamic
+# Kubernetes worker-node provisioning.
+#
 # -----------------------------------------------------------------------------
 
 module "karpenter" {
   source = "./modules/karpenter"
 
   cluster_name = var.cluster_name
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_issuer_url   = module.eks.cluster_oidc_issuer_url
+
+  namespace     = "kube-system"
+  chart_version = var.karpenter_chart_version
 }

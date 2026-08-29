@@ -474,6 +474,72 @@ kubectl delete -f infrastructure/storage/gp3-storageclass.yaml --ignore-not-foun
 echo "✓ gp3 StorageClass deleted."
 
 # --------------------------------------------------------------------
+#
+# Karpenter Cleanup
+#
+# Purpose:
+# Remove Karpenter-managed Kubernetes capacity before Terraform destroys
+# the Karpenter controller, IAM roles, instance profile, and Helm releases.
+#
+# The NodePool is deleted first so Karpenter can begin terminating nodes
+# that it previously provisioned. The EC2NodeClass is then removed after
+# the NodePool has been deleted.
+#
+# --------------------------------------------------------------------
+
+print_banner "Removing Karpenter"
+
+echo "Deleting Karpenter NodePool..."
+
+kubectl delete \
+  nodepool/default \
+  --ignore-not-found=true
+
+echo "✓ Karpenter NodePool deletion requested."
+
+echo
+echo "Waiting for Karpenter NodePool to be removed..."
+
+kubectl wait \
+  --for=delete \
+  nodepool/default \
+  --timeout=300s || true
+
+echo "✓ Karpenter NodePool removed."
+
+echo
+echo "Waiting for Karpenter-provisioned nodes to terminate..."
+
+KARPENTER_NODE_TIMEOUT=300
+KARPENTER_NODE_ELAPSED=0
+
+while kubectl get nodes \
+  -l karpenter.sh/nodepool=default \
+  --no-headers 2>/dev/null | grep -q .; do
+
+  if [ "$KARPENTER_NODE_ELAPSED" -ge "$KARPENTER_NODE_TIMEOUT" ]; then
+    echo "WARNING: Karpenter-provisioned nodes still exist after timeout."
+    kubectl get nodes -l karpenter.sh/nodepool=default || true
+    break
+  fi
+
+  echo "Waiting for Karpenter-provisioned nodes to terminate..."
+  sleep 10
+  KARPENTER_NODE_ELAPSED=$((KARPENTER_NODE_ELAPSED + 10))
+done
+
+echo "✓ Karpenter-provisioned nodes terminated."
+
+echo
+echo "Deleting Karpenter EC2NodeClass..."
+
+kubectl delete \
+  ec2nodeclass/default \
+  --ignore-not-found=true
+
+echo "✓ Karpenter EC2NodeClass removed."
+
+# --------------------------------------------------------------------
 # Terraform Cleanup
 # --------------------------------------------------------------------
 

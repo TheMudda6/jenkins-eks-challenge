@@ -22,6 +22,23 @@ resource "aws_eks_cluster" "main" {
 }
 
 # -----------------------------------------------------------------------------
+#
+# Karpenter Security Group Discovery Tag
+#
+# Purpose:
+# Tags the EKS-managed cluster security group so Karpenter can discover
+# the security group when provisioning EC2 worker nodes.
+#
+# -----------------------------------------------------------------------------
+
+resource "aws_ec2_tag" "karpenter_cluster_security_group" {
+  resource_id = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+
+  key   = "karpenter.sh/discovery"
+  value = aws_eks_cluster.main.name
+}
+
+# -----------------------------------------------------------------------------
 # Amazon EBS CSI Driver Add-on
 #
 # Purpose:

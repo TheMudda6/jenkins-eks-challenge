@@ -311,6 +311,55 @@ echo "✓ ArgoCD is ready."
 echo
 echo "✓ Cluster connectivity verified."
 
+# --------------------------------------------------------------------
+#
+# Karpenter
+#
+# Purpose:
+# Verify that the Karpenter controller is running before applying the
+# EC2NodeClass and NodePool resources that define dynamic node capacity.
+#
+# The Karpenter controller must be available first because it is
+# responsible for reconciling the NodePool and provisioning EC2 nodes.
+#
+# --------------------------------------------------------------------
+
+print_banner "Configuring Karpenter"
+
+echo "Waiting for Karpenter controller..."
+
+kubectl wait \
+  --for=condition=Available \
+  deployment/karpenter \
+  -n kube-system \
+  --timeout=300s
+
+echo "✓ Karpenter controller is ready."
+
+echo
+echo "Applying Karpenter EC2NodeClass..."
+
+kubectl apply \
+  -f "$TERRAFORM_DIR/modules/karpenter/ec2_node_class.yaml"
+
+echo "✓ Karpenter EC2NodeClass applied."
+
+echo
+echo "Applying Karpenter NodePool..."
+
+kubectl apply \
+  -f "$TERRAFORM_DIR/modules/karpenter/node_pool.yaml"
+
+echo "✓ Karpenter NodePool applied."
+
+echo
+echo "Verifying Karpenter resources..."
+
+kubectl get ec2nodeclass default
+kubectl get nodepool default
+
+echo "✓ Karpenter resources verified."
+
 echo
 echo "Verifying AWS Load Balancer Controller..."
 

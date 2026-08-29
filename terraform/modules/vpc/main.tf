@@ -47,6 +47,10 @@ resource "aws_subnet" "private" {
 
   availability_zone = element(var.availability_zones, index(var.private_subnets, each.value))
 
+  tags = merge(local.common_tags, {
+    "karpenter.sh/discovery" = var.cluster_name
+  })
+
 }
 
 # TODO:
