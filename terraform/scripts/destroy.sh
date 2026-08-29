@@ -4,6 +4,7 @@ set -euo pipefail
 
 cleanup() {
     rm -f tfplan dns.tfplan destroy.tfplan
+    rm -f "$TERRAFORM_DIR/dns/dns-destroy.tfplan"
 }
 
 trap cleanup EXIT
@@ -538,6 +539,68 @@ kubectl delete \
   --ignore-not-found=true
 
 echo "✓ Karpenter EC2NodeClass removed."
+
+# --------------------------------------------------------------------
+# Cloudflare DNS Cleanup
+#
+# Purpose:
+# Destroy the dedicated Cloudflare DNS Terraform stack before the AWS
+# infrastructure is removed.
+#
+# The ALB hostname is read from the DNS Terraform state because the
+# Kubernetes Ingress/ALB may no longer exist by this point.
+# --------------------------------------------------------------------
+
+print_banner "Cloudflare DNS Cleanup"
+
+echo "Retrieving ALB hostname from DNS Terraform state..."
+
+ALB_HOSTNAME=$(terraform -chdir="$TERRAFORM_DIR/dns" state show cloudflare_dns_record.jenkins \
+    | awk -F'"' '/content[[:space:]]*=/ {print $2}')
+
+if [ -z "$ALB_HOSTNAME" ]; then
+    echo "ERROR: Failed to retrieve ALB hostname from DNS Terraform state."
+    exit 1
+fi
+
+echo "✓ ALB hostname retrieved:"
+echo "$ALB_HOSTNAME"
+
+echo
+echo "Creating Cloudflare DNS destroy plan..."
+
+terraform -chdir="$TERRAFORM_DIR/dns" plan \
+    -destroy \
+    -var="cloudflare_zone_name=mud-as-sir.uk" \
+    -var="jenkins_hostname=jenkins.mud-as-sir.uk" \
+    -var="alb_hostname=$ALB_HOSTNAME" \
+    -out=dns-destroy.tfplan
+
+echo "✓ Cloudflare DNS destroy plan created."
+
+read -p "Proceed with Cloudflare DNS destroy? (yes/no): " dns_destroy_confirm
+
+if [ "$dns_destroy_confirm" != "yes" ]; then
+    echo "Cleanup cancelled."
+    exit 0
+fi
+
+echo "Destroying Cloudflare DNS..."
+
+terraform -chdir="$TERRAFORM_DIR/dns" apply -auto-approve dns-destroy.tfplan
+
+echo "✓ Cloudflare DNS destroyed."
+
+echo
+echo "Confirming Cloudflare DNS state is empty..."
+
+if terraform -chdir="$TERRAFORM_DIR/dns" state list | grep -q .; then
+    echo "ERROR: Cloudflare DNS Terraform state is not empty."
+    terraform -chdir="$TERRAFORM_DIR/dns" state list
+    exit 1
+else
+    echo "✓ Cloudflare DNS state is empty."
+fi
 
 # --------------------------------------------------------------------
 # Terraform Cleanup
