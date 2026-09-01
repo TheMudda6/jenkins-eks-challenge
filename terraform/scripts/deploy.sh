@@ -239,46 +239,6 @@ cd "$REPO_ROOT"
 
 echo "✓ Repository root located."
 
-echo "Building Docker image..."
-
-docker build \
-    -t application:latest \
-    -f application/Dockerfile \
-    application
-
-echo "✓ Docker image built successfully."
-
-# --------------------------------------------------------------------
-# Docker Tag
-#
-# Purpose:
-# Tag the locally built Docker image for Amazon ECR.
-# --------------------------------------------------------------------
-
-echo
-echo "Tagging Docker image..."
-
-docker tag \
-    application:latest \
-    "${REPOSITORY_URL}:latest"
-
-echo "✓ Docker image tagged."
-
-# --------------------------------------------------------------------
-# Docker Push
-#
-# Purpose:
-# Upload the application image to Amazon ECR so Kubernetes can pull it.
-# --------------------------------------------------------------------
-
-echo
-echo "Pushing Docker image to Amazon ECR..."
-
-docker push \
-    "${REPOSITORY_URL}:latest"
-
-echo "✓ Docker image pushed successfully."
-
 echo "Returning to Terraform directory..."
 
 cd "$TERRAFORM_DIR"
