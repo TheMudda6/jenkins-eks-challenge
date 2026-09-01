@@ -24,7 +24,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 env:
   IMAGE_NAME: application
@@ -87,3 +87,19 @@ jobs:
 
                 docker push \
                   ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
+
+            - name: Update Kubernetes image tag
+              run: |
+                  sed -i \
+                    "s/newTag: .*/newTag: ${GITHUB_SHA}/" \
+                    terraform/infrastructure/application/kustomization.yaml
+
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+                  git add terraform/infrastructure/application/kustomization.yaml
+
+                  git commit \
+                    -m "chore(cd): update application image to ${GITHUB_SHA} [skip ci]"
+
+                  git push

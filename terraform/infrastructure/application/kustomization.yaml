@@ -12,3 +12,7 @@ resources:
   - application-deployment.yaml
   - application-service.yaml
   - application-serviceaccount.yaml
+
+images:
+  - name: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-application
+    newTag: latest
