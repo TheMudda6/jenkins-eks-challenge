@@ -553,53 +553,63 @@ echo "✓ Karpenter EC2NodeClass removed."
 
 print_banner "Cloudflare DNS Cleanup"
 
-echo "Retrieving ALB hostname from DNS Terraform state..."
+echo "Checking Cloudflare DNS Terraform state..."
 
-ALB_HOSTNAME=$(terraform -chdir="$TERRAFORM_DIR/dns" state show cloudflare_dns_record.jenkins \
-    | awk -F'"' '/content[[:space:]]*=/ {print $2}')
+if terraform -chdir="$TERRAFORM_DIR/dns" state list | grep -q '^cloudflare_dns_record\.jenkins$'; then
 
-if [ -z "$ALB_HOSTNAME" ]; then
-    echo "ERROR: Failed to retrieve ALB hostname from DNS Terraform state."
-    exit 1
-fi
+    echo "✓ Cloudflare DNS record found in Terraform state."
+    echo "Retrieving ALB hostname from DNS Terraform state..."
 
-echo "✓ ALB hostname retrieved:"
-echo "$ALB_HOSTNAME"
+    ALB_HOSTNAME=$(terraform -chdir="$TERRAFORM_DIR/dns" state show cloudflare_dns_record.jenkins \
+        | awk -F'"' '/content[[:space:]]*=/ {print $2}')
 
-echo
-echo "Creating Cloudflare DNS destroy plan..."
+    if [ -z "$ALB_HOSTNAME" ]; then
+        echo "ERROR: Failed to retrieve ALB hostname from DNS Terraform state."
+        exit 1
+    fi
 
-terraform -chdir="$TERRAFORM_DIR/dns" plan \
-    -destroy \
-    -var="cloudflare_zone_name=mud-as-sir.uk" \
-    -var="jenkins_hostname=jenkins.mud-as-sir.uk" \
-    -var="alb_hostname=$ALB_HOSTNAME" \
-    -out=dns-destroy.tfplan
+    echo "✓ ALB hostname retrieved:"
+    echo "$ALB_HOSTNAME"
 
-echo "✓ Cloudflare DNS destroy plan created."
+    echo
+    echo "Creating Cloudflare DNS destroy plan..."
 
-read -p "Proceed with Cloudflare DNS destroy? (yes/no): " dns_destroy_confirm
+    terraform -chdir="$TERRAFORM_DIR/dns" plan \
+        -destroy \
+        -var="cloudflare_zone_name=mud-as-sir.uk" \
+        -var="jenkins_hostname=jenkins.mud-as-sir.uk" \
+        -var="alb_hostname=$ALB_HOSTNAME" \
+        -out=dns-destroy.tfplan
 
-if [ "$dns_destroy_confirm" != "yes" ]; then
-    echo "Cleanup cancelled."
-    exit 0
-fi
+    echo "✓ Cloudflare DNS destroy plan created."
 
-echo "Destroying Cloudflare DNS..."
+    read -p "Proceed with Cloudflare DNS destroy? (yes/no): " dns_destroy_confirm
 
-terraform -chdir="$TERRAFORM_DIR/dns" apply -auto-approve dns-destroy.tfplan
+    if [ "$dns_destroy_confirm" != "yes" ]; then
+        echo "Cleanup cancelled."
+        exit 0
+    fi
 
-echo "✓ Cloudflare DNS destroyed."
+    echo "Destroying Cloudflare DNS..."
 
-echo
-echo "Confirming Cloudflare DNS state is empty..."
+    terraform -chdir="$TERRAFORM_DIR/dns" apply -auto-approve dns-destroy.tfplan
 
-if terraform -chdir="$TERRAFORM_DIR/dns" state list | grep -q .; then
-    echo "ERROR: Cloudflare DNS Terraform state is not empty."
-    terraform -chdir="$TERRAFORM_DIR/dns" state list
-    exit 1
+    echo "✓ Cloudflare DNS destroyed."
+
+    echo
+    echo "Confirming Cloudflare DNS state is empty..."
+
+    if terraform -chdir="$TERRAFORM_DIR/dns" state list | grep -q .; then
+        echo "ERROR: Cloudflare DNS Terraform state is not empty."
+        terraform -chdir="$TERRAFORM_DIR/dns" state list
+        exit 1
+    else
+        echo "✓ Cloudflare DNS state is empty."
+    fi
+
 else
-    echo "✓ Cloudflare DNS state is empty."
+    echo "✓ No Cloudflare DNS resources found in Terraform state."
+    echo "Skipping Cloudflare DNS destruction."
 fi
 
 # --------------------------------------------------------------------
