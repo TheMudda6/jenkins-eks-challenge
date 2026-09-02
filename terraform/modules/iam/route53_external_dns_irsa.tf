@@ -79,6 +79,18 @@ data "aws_iam_policy_document" "external_dns" {
       "arn:aws:route53:::hostedzone/${var.route53_zone_id}"
     ]
   }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "route53:ListHostedZones"
+    ]
+
+    resources = [
+      "*"
+    ]
+  }
 }
 
 # -----------------------------------------------------------------------------

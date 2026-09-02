@@ -153,8 +153,18 @@ resource "helm_release" "external_dns" {
   }
 
   set {
+    name  = "extraArgs[0]"
+    value = "--zone-id-filter=/hostedzone/${var.route53_zone_id}"
+  }
+
+  set {
+    name  = "extraArgs[1]"
+    value = "--aws-zone-type=public"
+  }
+
+  set {
     name  = "policy"
-    value = "upsert-only"
+    value = "sync"
   }
 
   set {

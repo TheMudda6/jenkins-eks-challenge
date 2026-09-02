@@ -3,8 +3,7 @@
 set -euo pipefail
 
 cleanup() {
-    rm -f tfplan dns.tfplan destroy.tfplan
-    rm -f "$TERRAFORM_DIR/dns/dns-destroy.tfplan"
+    rm -f tfplan destroy.tfplan
 }
 
 trap cleanup EXIT
@@ -25,12 +24,6 @@ if [ -f "$ENV_FILE" ]; then
     set -a
     source "$ENV_FILE"
     set +a
-fi
-
-if [ -z "${TF_VAR_cloudflare_api_token:-}" ]; then
-    echo "ERROR: TF_VAR_cloudflare_api_token is not set."
-    echo "Check $ENV_FILE"
-    exit 1
 fi
 
 export AWS_PAGER=""
@@ -68,7 +61,6 @@ print_banner() {
 command -v terraform >/dev/null || { echo "ERROR: Terraform is not installed."; exit 1; }
 command -v aws >/dev/null || { echo "ERROR: AWS CLI is not installed."; exit 1; }
 command -v kubectl >/dev/null || { echo "ERROR: kubectl is not installed."; exit 1; }
-command -v helm >/dev/null || { echo "ERROR: Helm is not installed."; exit 1; }
 
 echo "✓ All prerequisites found."
 
@@ -98,37 +90,6 @@ echo "Checking cluster connectivity..."
 kubectl get nodes
 
 echo "✓ Cluster connectivity verified."
-
-# --------------------------------------------------------------------
-# ALB Verification
-#
-# Purpose:
-# Retrieve the AWS Load Balancer hostname before removing the Ingress.
-# --------------------------------------------------------------------
-
-echo
-echo "Retrieving ALB hostname..."
-
-ALB_HOSTNAME=$(kubectl get ingress jenkins-ingress \
-    -n "$NAMESPACE" \
-    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-
-if [ -z "$ALB_HOSTNAME" ]; then
-    echo "No ALB hostname found."
-else
-    echo "✓ ALB Hostname:"
-    echo "$ALB_HOSTNAME"
-
-    echo
-    echo "Verifying ALB DNS..."
-
-if nslookup "$ALB_HOSTNAME" >/dev/null 2>&1; then
-    echo "✓ ALB hostname resolves."
-else
-    echo "WARNING: ALB hostname is not yet resolvable."
-    echo "DNS propagation may still be in progress."
-fi
-fi
 
 echo "Deleting Jenkins ArgoCD Application..."
 
@@ -195,33 +156,6 @@ kubectl delete secret postgres-secret \
     --ignore-not-found=true
 
 echo "✓ PostgreSQL Kubernetes Secret deleted."
-
-
-# --------------------------------------------------------------------
-# External Secrets Operator Cleanup
-#
-# Purpose:
-# Remove External Secrets Operator after dependent resources are gone.
-# --------------------------------------------------------------------
-
-print_banner "Removing External Secrets Operator"
-
-echo "Deleting External Secrets Operator Helm release..."
-
-helm uninstall external-secrets \
-    -n external-secrets \
-    --ignore-not-found || true
-
-echo "✓ External Secrets Operator Helm release removed."
-
-
-echo
-echo "Waiting for External Secrets namespace cleanup..."
-
-kubectl delete namespace external-secrets \
-    --ignore-not-found=true
-
-echo "✓ External Secrets namespace removed."
 
 # --------------------------------------------------------------------
 # PostgreSQL Cleanup
@@ -541,78 +475,6 @@ kubectl delete \
 echo "✓ Karpenter EC2NodeClass removed."
 
 # --------------------------------------------------------------------
-# Cloudflare DNS Cleanup
-#
-# Purpose:
-# Destroy the dedicated Cloudflare DNS Terraform stack before the AWS
-# infrastructure is removed.
-#
-# The ALB hostname is read from the DNS Terraform state because the
-# Kubernetes Ingress/ALB may no longer exist by this point.
-# --------------------------------------------------------------------
-
-print_banner "Cloudflare DNS Cleanup"
-
-echo "Checking Cloudflare DNS Terraform state..."
-
-if terraform -chdir="$TERRAFORM_DIR/dns" state list | grep -q '^cloudflare_dns_record\.jenkins$'; then
-
-    echo "✓ Cloudflare DNS record found in Terraform state."
-    echo "Retrieving ALB hostname from DNS Terraform state..."
-
-    ALB_HOSTNAME=$(terraform -chdir="$TERRAFORM_DIR/dns" state show cloudflare_dns_record.jenkins \
-        | awk -F'"' '/content[[:space:]]*=/ {print $2}')
-
-    if [ -z "$ALB_HOSTNAME" ]; then
-        echo "ERROR: Failed to retrieve ALB hostname from DNS Terraform state."
-        exit 1
-    fi
-
-    echo "✓ ALB hostname retrieved:"
-    echo "$ALB_HOSTNAME"
-
-    echo
-    echo "Creating Cloudflare DNS destroy plan..."
-
-    terraform -chdir="$TERRAFORM_DIR/dns" plan \
-        -destroy \
-        -var="cloudflare_zone_name=mud-as-sir.uk" \
-        -var="jenkins_hostname=jenkins.mud-as-sir.uk" \
-        -var="alb_hostname=$ALB_HOSTNAME" \
-        -out=dns-destroy.tfplan
-
-    echo "✓ Cloudflare DNS destroy plan created."
-
-    read -p "Proceed with Cloudflare DNS destroy? (yes/no): " dns_destroy_confirm
-
-    if [ "$dns_destroy_confirm" != "yes" ]; then
-        echo "Cleanup cancelled."
-        exit 0
-    fi
-
-    echo "Destroying Cloudflare DNS..."
-
-    terraform -chdir="$TERRAFORM_DIR/dns" apply -auto-approve dns-destroy.tfplan
-
-    echo "✓ Cloudflare DNS destroyed."
-
-    echo
-    echo "Confirming Cloudflare DNS state is empty..."
-
-    if terraform -chdir="$TERRAFORM_DIR/dns" state list | grep -q .; then
-        echo "ERROR: Cloudflare DNS Terraform state is not empty."
-        terraform -chdir="$TERRAFORM_DIR/dns" state list
-        exit 1
-    else
-        echo "✓ Cloudflare DNS state is empty."
-    fi
-
-else
-    echo "✓ No Cloudflare DNS resources found in Terraform state."
-    echo "Skipping Cloudflare DNS destruction."
-fi
-
-# --------------------------------------------------------------------
 # Terraform Cleanup
 # --------------------------------------------------------------------
 
@@ -652,7 +514,13 @@ echo "✓ Terraform infrastructure destroyed."
 echo
 echo "Confirming Terraform state is empty..."
 
-terraform state list || echo "✓ Terraform state is empty."
+if terraform state list | grep -q .; then
+    echo "ERROR: Terraform state is not empty."
+    terraform state list
+    exit 1
+else
+    echo "✓ Terraform state is empty."
+fi
 
 # --------------------------------------------------------------------
 # Cleanup Verification
