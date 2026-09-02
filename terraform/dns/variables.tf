@@ -1,25 +1,28 @@
-variable "cloudflare_api_token" {
-  description = "Cloudflare API token used for DNS management."
-  type        = string
-  sensitive   = true
-}
+# -----------------------------------------------------------------------------
+#
+# Terraform DNS Variables
+#
+# Purpose:
+# Defines configuration for the dedicated Jenkins Route 53 hosted zone.
+#
+# -----------------------------------------------------------------------------
 
-variable "cloudflare_zone_name" {
-  description = "Cloudflare zone name."
-  type        = string
-}
-
-variable "jenkins_hostname" {
-  description = "Hostname used to access Jenkins."
+variable "aws_region" {
+  description = "AWS region used for Terraform provider configuration."
   type        = string
 }
 
-variable "alb_hostname" {
-  description = "AWS ALB hostname created by the Jenkins Kubernetes Ingress."
+variable "jenkins_zone_name" {
+  description = "Route 53 hosted zone name delegated to Jenkins."
   type        = string
 
   validation {
-    condition     = trimspace(var.alb_hostname) != ""
-    error_message = "alb_hostname must not be empty."
+    condition     = trimspace(var.jenkins_zone_name) != ""
+    error_message = "jenkins_zone_name must not be empty."
   }
+}
+
+variable "environment" {
+  description = "Deployment environment used for resource tagging."
+  type        = string
 }
