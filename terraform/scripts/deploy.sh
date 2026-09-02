@@ -3,7 +3,7 @@
 set -euo pipefail
 
 cleanup() {
-    rm -f tfplan dns.tfplan
+    rm -f tfplan
 }
 
 trap cleanup EXIT
@@ -28,12 +28,6 @@ if [ -f "$ENV_FILE" ]; then
     set -a
     source "$ENV_FILE"
     set +a
-fi
-
-if [ -z "${TF_VAR_cloudflare_api_token:-}" ]; then
-    echo "ERROR: TF_VAR_cloudflare_api_token is not set."
-    echo "Check $ENV_FILE"
-    exit 1
 fi
 
 # --------------------------------------------------------------------
@@ -73,11 +67,6 @@ command -v terraform >/dev/null || { echo "ERROR: Terraform is not installed."; 
 command -v aws >/dev/null || { echo "ERROR: AWS CLI is not installed."; exit 1; }
 command -v kubectl >/dev/null || { echo "ERROR: kubectl is not installed."; exit 1; }
 command -v helm >/dev/null || { echo "ERROR: Helm is not installed."; exit 1; }
-
-command -v docker >/dev/null || {
-    echo "ERROR: Docker is not installed."
-    exit 1
-}
 
 echo "✓ All prerequisites found."
 
@@ -130,15 +119,6 @@ print_banner "Terraform Deployment"
 
 echo "Creating Terraform execution plan..."
 
-echo "Checking Terraform Cloudflare token availability..."
-
-if [ -n "${TF_VAR_cloudflare_api_token:-}" ]; then
-    echo "✓ Terraform Cloudflare token available."
-else
-    echo "ERROR: Terraform Cloudflare token missing."
-    exit 1
-fi
-
 terraform plan -out=tfplan
 
 echo "✓ Terraform plan created."
@@ -178,72 +158,6 @@ if [ -z "$QUEUE_NAME" ]; then
 fi
 
 echo "✓ Queue name retrieved."
-
-REPOSITORY_URL=$(terraform output -raw repository_url)
-
-if [ -z "$REPOSITORY_URL" ]; then
-    echo "ERROR: Failed to retrieve ECR Repository URL."
-    exit 1
-fi
-
-echo "✓ Repository URL retrieved."
-
-REPOSITORY_NAME=$(terraform output -raw repository_name)
-
-if [ -z "$REPOSITORY_NAME" ]; then
-    echo "ERROR: Failed to retrieve ECR Repository Name."
-    exit 1
-fi
-
-echo "✓ Repository name retrieved."
-
-REGISTRY_URL="${REPOSITORY_URL%%/*}"
-
-if [ -z "$REGISTRY_URL" ]; then
-    echo "ERROR: Failed to determine ECR registry URL."
-    exit 1
-fi
-
-echo "✓ ECR registry URL determined."
-
-# --------------------------------------------------------------------
-# Docker Authentication
-#
-# Purpose:
-# Authenticate Docker with Amazon ECR.
-# --------------------------------------------------------------------
-
-print_banner "Docker Authentication"
-
-echo "Logging into Amazon ECR..."
-
-aws ecr get-login-password \
-| docker login \
-    --username AWS \
-    --password-stdin "$REGISTRY_URL"
-
-echo "✓ Docker authenticated with Amazon ECR."
-
-# --------------------------------------------------------------------
-# Docker Build
-#
-# Purpose:
-# Build the Go application container image.
-# --------------------------------------------------------------------
-
-print_banner "Building Application Image"
-
-echo "Changing to repository root..."
-
-cd "$REPO_ROOT"
-
-echo "✓ Repository root located."
-
-echo "Returning to Terraform directory..."
-
-cd "$TERRAFORM_DIR"
-
-echo "✓ Returned to Terraform directory."
 
 # --------------------------------------------------------------------
 # Kubernetes Configuration
@@ -426,18 +340,6 @@ echo "✓ Storage resources verified."
 # Manifests must match the installed CRD version.
 # --------------------------------------------------------------------
 
-print_banner "Installing External Secrets Operator"
-
-helm repo add external-secrets https://charts.external-secrets.io || true
-
-helm repo update
-
-helm upgrade --install external-secrets \
-  external-secrets/external-secrets \
-  --namespace external-secrets \
-  --create-namespace \
-  --set installCRDs=true
-
 echo "Waiting for External Secrets Operator..."
 
 kubectl wait \
@@ -525,8 +427,6 @@ kubectl describe secret postgres-secret \
 
 echo "✓ PostgreSQL Secret verified."
 
-echo "✓ Cloudflare DNS configured."
-
 # --------------------------------------------------------------------
 # ArgoCD Application Deployment
 #
@@ -570,68 +470,82 @@ done
 
 echo "✓ Jenkins ArgoCD Application synced."
 
-# --------------------------------------------------------------------
-# Cloudflare DNS
+# -----------------------------------------------------------------------------
+# Traefik NLB and ExternalDNS
 #
 # Purpose:
-# Retrieve the AWS Load Balancer hostname assigned to the Ingress.
-# --------------------------------------------------------------------
+# Verify that Traefik has received an AWS Network Load Balancer and that
+# ExternalDNS has published the Jenkins hostname to the delegated Route 53 zone.
+# -----------------------------------------------------------------------------
 
-echo
-echo "Retrieving ALB hostname..."
+print_banner "Verifying Traefik NLB and DNS"
 
-ALB_HOSTNAME=$(kubectl get ingress jenkins-ingress \
-    -n "$NAMESPACE" \
+echo "Waiting for Traefik deployment..."
+kubectl wait \
+    --for=condition=Available \
+    deployment/traefik \
+    -n traefik \
+    --timeout=300s
+
+echo "✓ Traefik deployment is ready."
+
+echo "Waiting for Traefik NLB hostname..."
+
+kubectl wait \
+    --for=jsonpath='{.status.loadBalancer.ingress[0].hostname}' \
+    service/traefik \
+    -n traefik \
+    --timeout=300s
+
+TRAEFIK_NLB_HOSTNAME=$(kubectl get service traefik \
+    -n traefik \
     -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-    
-if [ -z "$ALB_HOSTNAME" ]; then
-    echo
-    echo "ERROR: Failed to retrieve the ALB hostname."
+
+if [ -z "$TRAEFIK_NLB_HOSTNAME" ]; then
+    echo "ERROR: Failed to retrieve the Traefik NLB hostname."
     exit 1
 fi
 
-echo "✓ ALB Hostname:"
-echo "$ALB_HOSTNAME"
+echo "✓ Traefik NLB hostname:"
+echo "$TRAEFIK_NLB_HOSTNAME"
 
-echo
-echo "Verifying ALB DNS..."
+echo "Verifying Traefik NLB DNS..."
 
-if nslookup "$ALB_HOSTNAME" >/dev/null 2>&1; then
-    echo "✓ ALB hostname resolves."
+if nslookup "$TRAEFIK_NLB_HOSTNAME" >/dev/null 2>&1; then
+    echo "✓ Traefik NLB hostname resolves."
 else
-    echo "WARNING: ALB hostname is not yet resolvable."
-    echo "DNS propagation may still be in progress."
+    echo "WARNING: Traefik NLB hostname is not yet resolvable."
 fi
 
-echo
-echo "Ingress status:"
-kubectl get ingress -n "$NAMESPACE"
+echo "Waiting for ExternalDNS..."
+kubectl wait \
+    --for=condition=Available \
+    deployment/external-dns \
+    -n external-dns \
+    --timeout=300s
+
+echo "✓ ExternalDNS is ready."
+
+echo "Waiting for Jenkins DNS record..."
+
+DNS_TIMEOUT=300
+DNS_ELAPSED=0
+
+while ! nslookup jenkins.mud-as-sir.uk >/dev/null 2>&1; do
+    if [ "$DNS_ELAPSED" -ge "$DNS_TIMEOUT" ]; then
+        echo "ERROR: Jenkins DNS record did not become resolvable within ${DNS_TIMEOUT}s."
+        exit 1
+    fi
+
+    sleep 10
+    DNS_ELAPSED=$((DNS_ELAPSED + 10))
+done
+
+echo "✓ jenkins.mud-as-sir.uk resolves."
 
 echo
-echo "Ingress details:"
-kubectl describe ingress jenkins-ingress -n "$NAMESPACE"
-
-# --------------------------------------------------------------------
-# Cloudflare DNS Configuration
-# --------------------------------------------------------------------
-
-print_banner "Configuring Cloudflare DNS"
-
-echo "Creating Terraform plan for Cloudflare DNS..."
-
-terraform -chdir="$TERRAFORM_DIR/dns" plan \
-    -var="cloudflare_zone_name=mud-as-sir.uk" \
-    -var="jenkins_hostname=jenkins.mud-as-sir.uk" \
-    -var="alb_hostname=$ALB_HOSTNAME" \
-    -out=dns.tfplan
-
-echo "✓ Cloudflare DNS plan created."
-
-echo "Applying Cloudflare DNS plan..."
-
-terraform -chdir="$TERRAFORM_DIR/dns" apply dns.tfplan
-
-echo "✓ Cloudflare DNS configured."
+echo "Jenkins URL:"
+echo "https://jenkins.mud-as-sir.uk"
 
 echo
 echo "ArgoCD Application status:"
