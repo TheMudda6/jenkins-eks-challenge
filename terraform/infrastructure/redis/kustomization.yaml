@@ -1,13 +1,10 @@
 # -----------------------------------------------------------------------------
 # Redis Kustomization
 #
-# Purpose:
 # Defines the Kubernetes resources required to deploy Redis.
-#
-# Kustomize uses this file as the entry point for the Redis Deployment
-# and Redis Service resources.
 # -----------------------------------------------------------------------------
 
 resources:
   - redis-deployment.yaml
   - redis-service.yaml
+  - redis-secret.yaml

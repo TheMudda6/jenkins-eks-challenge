@@ -1,22 +1,24 @@
 # -----------------------------------------------------------------------------
-# Redis Deployment
+# Redis StatefulSet
 #
 # Purpose:
-# Deploys a single Redis Pod to provide fast in-memory caching
-# for the application.
+# Runs Redis as a persistent stateful workload.
 #
-# Redis is deployed as a Kubernetes workload within the Jenkins namespace
-# and is accessed internally through the Redis Service.
+# Redis uses:
+# - A 10Gi gp3 PVC created by volumeClaimTemplates
+# - AOF persistence
+# - Password authentication
+# - Kubernetes health probes
 # -----------------------------------------------------------------------------
 
 apiVersion: apps/v1
-kind: Deployment
-
+kind: StatefulSet
 metadata:
   name: redis
   namespace: jenkins
 
 spec:
+  serviceName: redis
   replicas: 1
 
   selector:
@@ -29,11 +31,72 @@ spec:
         app: redis
 
     spec:
-      containers:
+      terminationGracePeriodSeconds: 30
 
+      containers:
         - name: redis
           image: redis:8.2
 
           ports:
             - containerPort: 6379
               name: redis
+
+          command:
+            - sh
+            - -c
+            - exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"
+
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_PASSWORD
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+
+      spec:
+        accessModes:
+          - ReadWriteOnce
+
+        storageClassName: gp3
+
+        resources:
+          requests:
+            storage: 10Gi

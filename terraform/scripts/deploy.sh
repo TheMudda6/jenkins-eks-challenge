@@ -67,6 +67,10 @@ command -v terraform >/dev/null || { echo "ERROR: Terraform is not installed."; 
 command -v aws >/dev/null || { echo "ERROR: AWS CLI is not installed."; exit 1; }
 command -v kubectl >/dev/null || { echo "ERROR: kubectl is not installed."; exit 1; }
 command -v helm >/dev/null || { echo "ERROR: Helm is not installed."; exit 1; }
+command -v nslookup >/dev/null || {
+  echo "ERROR: nslookup is not installed."
+  exit 1
+}
 
 echo "✓ All prerequisites found."
 
@@ -434,6 +438,53 @@ echo "✓ PostgreSQL Secret verified."
 # Create the ArgoCD Application after cluster prerequisites exist.
 # ArgoCD will manage application lifecycle from Git.
 # --------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Verify application image exists in ECR before ArgoCD deployment
+# -----------------------------------------------------------------------------
+
+echo
+echo "========================================"
+echo "Checking Application Image"
+echo "========================================"
+
+ECR_REPOSITORY="$(terraform output -raw repository_name)"
+APPLICATION_KUSTOMIZATION="$TERRAFORM_DIR/infrastructure/application/kustomization.yaml"
+
+if [[ ! -f "$APPLICATION_KUSTOMIZATION" ]]; then
+  echo "ERROR: Application Kustomize file not found:"
+  echo "  $APPLICATION_KUSTOMIZATION"
+  exit 1
+fi
+
+APPLICATION_IMAGE_TAG="$(awk -F': ' '/newTag:/ {print $2; exit}' "$APPLICATION_KUSTOMIZATION")"
+
+if [[ -z "$APPLICATION_IMAGE_TAG" ]]; then
+  echo "ERROR: Could not determine application image tag from:"
+  echo "  $APPLICATION_KUSTOMIZATION"
+  exit 1
+fi
+
+echo "ECR repository: $ECR_REPOSITORY"
+echo "Expected image tag: $APPLICATION_IMAGE_TAG"
+
+if ! aws ecr describe-images \
+  --repository-name "$ECR_REPOSITORY" \
+  --region "$AWS_REGION" \
+  --image-ids "imageTag=$APPLICATION_IMAGE_TAG" \
+  >/dev/null 2>&1; then
+
+  echo
+  echo "ERROR: Application image does not exist in ECR."
+  echo "  Repository: $ECR_REPOSITORY"
+  echo "  Tag:        $APPLICATION_IMAGE_TAG"
+  echo
+  echo "Run the Application CI pipeline first so it can build"
+  echo "and publish the commit-SHA image to ECR."
+  exit 1
+fi
+
+echo "✓ Application image exists in ECR."
 
 print_banner "Installing ArgoCD Application"
 
