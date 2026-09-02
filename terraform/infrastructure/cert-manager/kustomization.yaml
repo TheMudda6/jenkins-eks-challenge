@@ -1,0 +1,11 @@
+# -----------------------------------------------------------------------------
+# cert-manager Kustomization
+#
+# Purpose:
+# Defines the cert-manager Kubernetes resources managed by Kustomize for
+# TLS certificate issuance and renewal.
+#
+# -----------------------------------------------------------------------------
+
+resources:
+  - cluster-issuer.yaml

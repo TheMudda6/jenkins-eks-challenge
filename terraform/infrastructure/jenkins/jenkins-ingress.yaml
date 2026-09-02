@@ -2,10 +2,10 @@
 # Jenkins Ingress
 #
 # Purpose:
-# Exposes Jenkins to the internet through an AWS Application Load Balancer.
+# Exposes Jenkins through Traefik using the AWS Network Load Balancer.
+# TLS certificates are issued and renewed by cert-manager through
+# Let's Encrypt DNS-01 validation using the delegated Route 53 zone.
 #
-# The Ingress configures an internet-facing ALB with HTTP and HTTPS listeners,
-# TLS termination using an ACM certificate, and HTTP-to-HTTPS redirection.
 # -----------------------------------------------------------------------------
 
 apiVersion: networking.k8s.io/v1
@@ -13,25 +13,26 @@ kind: Ingress
 metadata:
   name: jenkins-ingress
   namespace: jenkins
-
   annotations:
-    kubernetes.io/ingress.class: alb
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:eu-west-2:893061519920:certificate/1b421a85-ca19-41e9-95d0-698c0227cae6"
-    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    external-dns.alpha.kubernetes.io/hostname: jenkins.mud-as-sir.uk
 
 spec:
-  ingressClassName: alb
+  ingressClassName: traefik
+
+  tls:
+    - hosts:
+        - jenkins.mud-as-sir.uk
+      secretName: jenkins-tls
 
   rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: jenkins-service
-            port:
-              number: 8080
+    - host: jenkins.mud-as-sir.uk
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jenkins-service
+                port:
+                  number: 8080

@@ -1,0 +1,29 @@
+# -----------------------------------------------------------------------------
+# Let's Encrypt ClusterIssuer
+#
+# Purpose:
+# Configures cert-manager to obtain and renew TLS certificates from
+# Let's Encrypt using DNS-01 validation through the delegated Route 53
+# hosted zone for jenkins.mud-as-sir.uk.
+#
+# -----------------------------------------------------------------------------
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+
+spec:
+  acme:
+    email: mudassirshaikh1997@outlook.com
+
+    server: https://acme-v02.api.letsencrypt.org/directory
+
+    privateKeySecretRef:
+      name: letsencrypt-production
+
+    solvers:
+      - dns01:
+          route53:
+            region: eu-west-2
+            hostedZoneID: Z00908461IC8I0L6Q7CIM
