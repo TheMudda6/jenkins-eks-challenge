@@ -144,3 +144,35 @@ variable "postgres_secret_arn" {
   description = "ARN of the PostgreSQL secret stored in AWS Secrets Manager."
   type        = string
 }
+# -----------------------------------------------------------------------------
+# Route 53 / ExternalDNS
+# -----------------------------------------------------------------------------
+
+variable "route53_zone_id" {
+  description = "Route 53 hosted zone ID managed by ExternalDNS and cert-manager."
+  type        = string
+}
+
+variable "external_dns_role_name" {
+  description = "IAM Role name for ExternalDNS."
+  type        = string
+}
+
+variable "external_dns_policy_name" {
+  description = "IAM Policy name for ExternalDNS."
+  type        = string
+}
+
+# -----------------------------------------------------------------------------
+# cert-manager
+# -----------------------------------------------------------------------------
+
+variable "cert_manager_role_name" {
+  description = "IAM Role name for cert-manager."
+  type        = string
+}
+
+variable "cert_manager_policy_name" {
+  description = "IAM Policy name for cert-manager."
+  type        = string
+}

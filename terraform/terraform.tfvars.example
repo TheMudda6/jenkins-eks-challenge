@@ -78,3 +78,14 @@ max_size     = 2
 
 cloudflare_zone_name = "YOUR_DOMAIN"
 jenkins_hostname     = "jenkins.YOUR_DOMAIN"
+
+
+# -----------------------------------------------------------------------------
+# Route 53 / ExternalDNS / cert-manager
+# -----------------------------------------------------------------------------
+
+route53_zone_id          = "ZXXXXXXXXXXXXXXX"
+external_dns_role_name   = "jenkins-external-dns-role"
+external_dns_policy_name = "jenkins-external-dns-policy"
+cert_manager_role_name   = "jenkins-cert-manager-role"
+cert_manager_policy_name = "jenkins-cert-manager-policy"

@@ -33,3 +33,21 @@ output "github_actions_role_arn" {
   description = "ARN of the GitHub Actions IAM Role"
   value       = aws_iam_role.github_actions_oidc_role.arn
 }
+
+# -----------------------------------------------------------------------------
+# Route 53 / ExternalDNS
+# -----------------------------------------------------------------------------
+
+output "external_dns_role_arn" {
+  value       = aws_iam_role.external_dns.arn
+  description = "ARN of the ExternalDNS IAM Role."
+}
+
+# -----------------------------------------------------------------------------
+# cert-manager
+# -----------------------------------------------------------------------------
+
+output "cert_manager_role_arn" {
+  value       = aws_iam_role.cert_manager.arn
+  description = "ARN of the cert-manager IAM Role."
+}

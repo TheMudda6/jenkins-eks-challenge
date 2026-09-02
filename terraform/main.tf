@@ -71,6 +71,16 @@ module "iam" {
 
   postgres_secret_arn = module.secrets.postgres_secret_arn
 
+  # ---------------------------------------------------------------------------
+  # Route 53 / ExternalDNS / cert-manager
+  # ---------------------------------------------------------------------------
+
+  route53_zone_id          = var.route53_zone_id
+  external_dns_role_name   = var.external_dns_role_name
+  external_dns_policy_name = var.external_dns_policy_name
+  cert_manager_role_name   = var.cert_manager_role_name
+  cert_manager_policy_name = var.cert_manager_policy_name
+
   oidc_provider_arn = module.eks.oidc_provider_arn
 
   cluster_oidc_issuer_url = module.eks.cluster_oidc_issuer_url
