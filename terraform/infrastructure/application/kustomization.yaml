@@ -15,4 +15,4 @@ resources:
 
 images:
   - name: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-application
-    newTag: bb15502ef0f95534f24c29ce334acc9f1291fb14
+    newTag: 55244c7a30aa90ad600493bd1d2df685410510f4
