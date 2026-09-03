@@ -1,17 +1,15 @@
 # -----------------------------------------------------------------------------
-#
 # Application Kustomization
 #
-# Purpose:
-# Defines the Kubernetes resources that make up the application workloads.
-#
+# The legacy monolith is retained temporarily while the nine-service
+# architecture is migrated. The dev overlay is the active application stack.
 # -----------------------------------------------------------------------------
 
 resources:
   # Existing monolith - retained temporarily during the nine-service migration.
-  - application-deployment.yaml
-  - application-service.yaml
-  - application-serviceaccount.yaml
+  - legacy/application-deployment.yaml
+  - legacy/application-service.yaml
+  - legacy/application-serviceaccount.yaml
 
   # New nine-service architecture.
-  - api-gateway
+  - overlays/dev

@@ -1,0 +1,17 @@
+# -----------------------------------------------------------------------------
+# Application Base Kustomization
+#
+# Contains the Kubernetes resources for the nine-service application platform.
+# Environment-specific configuration is applied by the overlays.
+# -----------------------------------------------------------------------------
+
+resources:
+  - services/api-gateway
+  - services/order-service
+  - services/inventory-service
+  - services/payment-service
+  - services/notification-service
+  - services/shipping-service
+  - services/dashboard-api
+  - services/scheduler
+  - services/worker
