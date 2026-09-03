@@ -1,18 +1,17 @@
 # -----------------------------------------------------------------------------
+#
 # Application Kustomization
 #
 # Purpose:
-# Defines the Kubernetes resources that make up the application workload.
+# Defines the Kubernetes resources that make up the application workloads.
 #
-# Kustomize uses this file as the entry point for deploying the application
-# Deployment, Service and Service Account as a single resource group.
 # -----------------------------------------------------------------------------
 
 resources:
+  # Existing monolith - retained temporarily during the nine-service migration.
   - application-deployment.yaml
   - application-service.yaml
   - application-serviceaccount.yaml
 
-images:
-  - name: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-application
-    newTag: 55244c7a30aa90ad600493bd1d2df685410510f4
+  # New nine-service architecture.
+  - api-gateway
