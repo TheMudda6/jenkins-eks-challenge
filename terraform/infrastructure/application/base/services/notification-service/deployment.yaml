@@ -16,7 +16,7 @@ spec:
       serviceAccountName: notification-service
       containers:
         - name: notification-service
-          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-notification-serviceatest
+          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-notification-service:latest
           imagePullPolicy: Always
           ports:
             - name: http

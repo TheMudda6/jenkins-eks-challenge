@@ -16,7 +16,7 @@ spec:
       serviceAccountName: worker
       containers:
         - name: worker
-          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-workeratest
+          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-worker:latest
           imagePullPolicy: Always
           ports:
             - name: http

@@ -16,7 +16,7 @@ spec:
       serviceAccountName: payment-service
       containers:
         - name: payment-service
-          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-payment-serviceatest
+          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-payment-service:latest
           imagePullPolicy: Always
           ports:
             - name: http

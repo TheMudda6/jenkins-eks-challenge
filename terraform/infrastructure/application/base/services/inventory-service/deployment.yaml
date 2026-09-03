@@ -16,7 +16,7 @@ spec:
       serviceAccountName: inventory-service
       containers:
         - name: inventory-service
-          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-inventory-serviceatest
+          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-inventory-service:latest
           imagePullPolicy: Always
           ports:
             - name: http
