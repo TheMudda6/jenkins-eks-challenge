@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: jenkins
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      serviceAccountName: api-gateway
+      containers:
+        - name: api-gateway
+          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-api-gateway:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@redis:6379"
+
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_PASSWORD
+
+            - name: ORDER_SERVICE_URL
+              value: "http://order-service:8081"
+
+            - name: INVENTORY_SERVICE_URL
+              value: "http://inventory-service:8082"
+
+            - name: PAYMENT_SERVICE_URL
+              value: "http://payment-service:8083"
+
+            - name: NOTIFICATION_SERVICE_URL
+              value: "http://notification-service:8084"
+
+            - name: SHIPPING_SERVICE_URL
+              value: "http://shipping-service:8085"
+
+            - name: DASHBOARD_SERVICE_URL
+              value: "http://dashboard-api:8086"
+
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

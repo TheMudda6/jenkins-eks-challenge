@@ -62,7 +62,7 @@ module "iam" {
 
   github_actions_oidc_role_name = var.github_actions_oidc_role_name
 
-  ecr_repository_arn = module.ecr.repository_arn
+  ecr_repository_arns = toset(values(module.ecr.repository_arns))
 
   application_namespace            = "jenkins"
   application_service_account_name = "application-sa"
@@ -178,14 +178,14 @@ module "ecr" {
   environment  = var.environment
 }
 
-output "repository_url" {
-  description = "Application ECR repository URL"
-  value       = module.ecr.repository_url
+output "repository_urls" {
+  description = "ECR repository URLs keyed by service name."
+  value       = module.ecr.repository_urls
 }
 
-output "repository_name" {
-  description = "Application ECR repository name"
-  value       = module.ecr.repository_name
+output "repository_names" {
+  description = "ECR repository names keyed by service name."
+  value       = module.ecr.repository_names
 }
 
 output "github_actions_role_arn" {

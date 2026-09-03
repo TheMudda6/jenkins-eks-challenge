@@ -130,9 +130,9 @@ variable "orders_queue_arn" {
 # GitHub Actions
 # --------------------------------------------------------------------
 
-variable "ecr_repository_arn" {
-  description = "ARN of the ECR repository used by GitHub Actions."
-  type        = string
+variable "ecr_repository_arns" {
+  description = "ARNs of the ECR repositories used by GitHub Actions."
+  type        = set(string)
 }
 
 variable "github_actions_oidc_role_name" {

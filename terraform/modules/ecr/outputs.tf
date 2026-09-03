@@ -3,19 +3,30 @@
 # ECR Module Outputs
 #
 # Purpose:
-# Exposes the ECR repository URL, name and ARN for use by other
-# Terraform modules and deployment workflows.
+# Exposes repository URLs, names and ARNs for all application services.
 #
 # -----------------------------------------------------------------------------
 
-output "repository_url" {
-  value = aws_ecr_repository.application.repository_url
+output "repository_urls" {
+  description = "ECR repository URLs keyed by service name."
+  value = {
+    for service, repository in aws_ecr_repository.services :
+    service => repository.repository_url
+  }
 }
 
-output "repository_name" {
-  value = aws_ecr_repository.application.name
+output "repository_names" {
+  description = "ECR repository names keyed by service name."
+  value = {
+    for service, repository in aws_ecr_repository.services :
+    service => repository.name
+  }
 }
 
-output "repository_arn" {
-  value = aws_ecr_repository.application.arn
+output "repository_arns" {
+  description = "ECR repository ARNs keyed by service name."
+  value = {
+    for service, repository in aws_ecr_repository.services :
+    service => repository.arn
+  }
 }

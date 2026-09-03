@@ -1,17 +1,30 @@
 # -----------------------------------------------------------------------------
 #
-# Amazon ECR Repository
+# Amazon ECR Repositories
 #
 # Purpose:
-# Creates the Amazon Elastic Container Registry (ECR) repository used to
-# store container images for the application.
+# Creates one Amazon ECR repository for each application service.
 #
 # -----------------------------------------------------------------------------
 
-resource "aws_ecr_repository" "application" {
-  name = "${var.project_name}-${var.environment}-application"
+locals {
+  services = toset([
+    "api-gateway",
+    "order-service",
+    "inventory-service",
+    "payment-service",
+    "notification-service",
+    "shipping-service",
+    "dashboard-api",
+    "scheduler",
+    "worker",
+  ])
+}
 
+resource "aws_ecr_repository" "services" {
+  for_each = local.services
+
+  name                 = "${var.project_name}-${var.environment}-${each.key}"
   image_tag_mutability = "MUTABLE"
-
-  force_delete = true
+  force_delete         = true
 }
