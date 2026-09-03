@@ -14,10 +14,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+
 	_ "github.com/lib/pq"
 )
 
 var db *sql.DB
+var sqsClient *sqs.Client
 
 func main() {
 	dbURL := os.Getenv("DATABASE_URL")
@@ -26,6 +31,13 @@ func main() {
 	}
 
 	var err error
+
+	awsConfig, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to load AWS config: %v", err)
+	}
+	sqsClient = sqs.NewFromConfig(awsConfig)
+
 	db, err = sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -420,7 +432,21 @@ func publishEvent(eventType string, payload map[string]interface{}) {
 		"payload":   payload,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
-	data, _ := json.Marshal(event)
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal event %s: %v", eventType, err)
+		return
+	}
+
+	_, err = sqsClient.SendMessage(context.Background(), &sqs.SendMessageInput{
+		QueueUrl:    &sqsQueue,
+		MessageBody: aws.String(string(data)),
+	})
+	if err != nil {
+		log.Printf("Failed to send event %s to SQS: %v", eventType, err)
+		return
+	}
+
 	log.Printf("Event -> SQS: %s", string(data))
 }
 

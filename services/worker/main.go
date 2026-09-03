@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqsTypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +27,12 @@ func main() {
 	if sqsQueue == "" {
 		log.Fatal("SQS_QUEUE_URL is required")
 	}
+
+	awsConfig, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to load AWS config: %v", err)
+	}
+	sqsClient := sqs.NewFromConfig(awsConfig)
 
 	// Internal service URLs for event-driven calls
 	services := map[string]string{
@@ -59,10 +69,10 @@ func main() {
 	}()
 
 	log.Println("Worker started, polling SQS for events...")
-	pollAndProcess(ctx, sqsQueue, services)
+	pollAndProcess(ctx, sqsClient, sqsQueue, services)
 }
 
-func pollAndProcess(ctx context.Context, queueURL string, services map[string]string) {
+func pollAndProcess(ctx context.Context, sqsClient *sqs.Client, queueURL string, services map[string]string) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	for {
@@ -71,30 +81,49 @@ func pollAndProcess(ctx context.Context, queueURL string, services map[string]st
 			log.Println("Worker stopped")
 			return
 		default:
-			messages := receiveSQSMessages(ctx, queueURL)
+		}
 
-			for _, raw := range messages {
-				var event Event
-				if err := json.Unmarshal([]byte(raw), &event); err != nil {
-					log.Printf("Failed to parse event: %v", err)
-					continue
-				}
+		messages, err := receiveSQSMessages(ctx, sqsClient, queueURL)
+		if err != nil {
+			if ctx.Err() != nil {
+				log.Println("Worker stopped")
+				return
+			}
+			log.Printf("Failed to receive SQS messages: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
 
-				log.Printf("Processing event: %s", event.Type)
-
-				if err := handleEvent(client, services, event); err != nil {
-					log.Printf("Failed to handle event %s: %v", event.Type, err)
-					// In production: don't delete from SQS, let it retry or go to DLQ
-					continue
-				}
-
-				log.Printf("Successfully processed: %s", event.Type)
-				// Delete message from SQS after successful processing
+		for _, message := range messages {
+			if message.Body == nil || message.ReceiptHandle == nil {
+				log.Println("Received SQS message without body or receipt handle")
+				continue
 			}
 
-			if len(messages) == 0 {
-				time.Sleep(5 * time.Second)
+			var event Event
+			if err := json.Unmarshal([]byte(*message.Body), &event); err != nil {
+				log.Printf("Failed to parse event: %v", err)
+				continue
 			}
+
+			log.Printf("Processing event: %s", event.Type)
+
+			if err := handleEvent(client, services, event); err != nil {
+				log.Printf("Failed to handle event %s: %v", event.Type, err)
+				// Do not delete the message. SQS will make it
+				// visible again and eventually move it to the DLQ.
+				continue
+			}
+
+			if _, err := sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+				QueueUrl:      aws.String(queueURL),
+				ReceiptHandle: message.ReceiptHandle,
+			}); err != nil {
+				log.Printf("Failed to delete processed message %s: %v", event.Type, err)
+				continue
+			}
+
+			log.Printf("Successfully processed and deleted: %s", event.Type)
 		}
 	}
 }
@@ -177,13 +206,17 @@ func handleEvent(client *http.Client, services map[string]string, event Event) e
 	return nil
 }
 
-func receiveSQSMessages(ctx context.Context, queueURL string) []string {
-	// Students implement with AWS SDK SQS ReceiveMessage
-	// Use long polling: WaitTimeSeconds = 20
-	// MaxNumberOfMessages = 10
-	// Honour ctx during the long-poll so SIGTERM unblocks cleanly
-	_ = ctx
-	return nil
+func receiveSQSMessages(ctx context.Context, sqsClient *sqs.Client, queueURL string) ([]sqsTypes.Message, error) {
+	result, err := sqsClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		QueueUrl:            aws.String(queueURL),
+		WaitTimeSeconds:     20,
+		MaxNumberOfMessages: 10,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result.Messages, nil
 }
 
 func getEnv(key, fallback string) string {
