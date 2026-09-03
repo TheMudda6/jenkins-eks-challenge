@@ -278,12 +278,24 @@ variable "namespace" {
   type        = string
 }
 
-variable "application_role_name" {
-  type = string
+variable "event_producer_role_name" {
+  description = "IAM Role name for services that publish events to SQS."
+  type        = string
 }
 
-variable "application_policy_name" {
-  type = string
+variable "event_producer_policy_name" {
+  description = "IAM Policy name for services that publish events to SQS."
+  type        = string
+}
+
+variable "event_worker_role_name" {
+  description = "IAM Role name for the SQS worker."
+  type        = string
+}
+
+variable "event_worker_policy_name" {
+  description = "IAM Policy name for the SQS worker."
+  type        = string
 }
 
 variable "github_actions_oidc_role_name" {

@@ -57,15 +57,16 @@ module "iam" {
   ebs_csi_driver_role_name                 = var.ebs_csi_driver_role_name
   aws_load_balancer_controller_role_name   = var.aws_load_balancer_controller_role_name
   aws_load_balancer_controller_policy_name = var.aws_load_balancer_controller_policy_name
-  application_role_name                    = var.application_role_name
-  application_policy_name                  = var.application_policy_name
+  event_producer_role_name                 = var.event_producer_role_name
+  event_worker_role_name                   = var.event_worker_role_name
+  event_producer_policy_name               = var.event_producer_policy_name
+  event_worker_policy_name                 = var.event_worker_policy_name
 
   github_actions_oidc_role_name = var.github_actions_oidc_role_name
 
   ecr_repository_arns = toset(values(module.ecr.repository_arns))
 
-  application_namespace            = "jenkins"
-  application_service_account_name = "application-sa"
+  application_namespace = "jenkins"
 
   orders_queue_arn = module.sqs.queue_arn
 

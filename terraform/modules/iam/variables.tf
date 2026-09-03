@@ -98,26 +98,32 @@ variable "aws_load_balancer_controller_policy_name" {
 }
 
 # -----------------------------------------------------------------------------
-# Application IRSA
+# -----------------------------------------------------------------------------
+# Event Bus IRSA
 # -----------------------------------------------------------------------------
 
-variable "application_role_name" {
-  description = "IAM Role name for the application."
+variable "event_producer_role_name" {
+  description = "IAM Role name for services that publish events to SQS."
   type        = string
 }
 
-variable "application_policy_name" {
-  description = "IAM Policy name for the application."
+variable "event_producer_policy_name" {
+  description = "IAM Policy name for services that publish events to SQS."
+  type        = string
+}
+
+variable "event_worker_role_name" {
+  description = "IAM Role name for the SQS worker."
+  type        = string
+}
+
+variable "event_worker_policy_name" {
+  description = "IAM Policy name for the SQS worker."
   type        = string
 }
 
 variable "application_namespace" {
-  description = "Kubernetes namespace where the application runs."
-  type        = string
-}
-
-variable "application_service_account_name" {
-  description = "Kubernetes Service Account used by the application."
+  description = "Kubernetes namespace where the event services run."
   type        = string
 }
 
@@ -126,7 +132,8 @@ variable "orders_queue_arn" {
   type        = string
 }
 
-# --------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
 # GitHub Actions
 # --------------------------------------------------------------------
 
