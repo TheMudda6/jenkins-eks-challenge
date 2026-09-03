@@ -1,14 +1,10 @@
-# --------------------------------------------------------------------
-# Application CI and Container Build Workflow
+# -----------------------------------------------------------------------------
+# Application CI/CD
 #
-# Purpose:
-# Build, test and publish the application container automatically
-# through GitHub Actions.
-#
-# This workflow compiles and tests the Go application, authenticates
-# to AWS using GitHub Actions OIDC, builds the Docker image and
-# publishes versioned and latest images to Amazon ECR.
-# --------------------------------------------------------------------
+# Builds, tests, scans and publishes all nine application services.
+# Images are tagged with the immutable Git commit SHA and pushed to the
+# service-specific ECR repository.
+# -----------------------------------------------------------------------------
 
 name: Application CI
 
@@ -17,7 +13,6 @@ on:
     branches:
       - main
       - stable-v1.31
-
   pull_request:
     branches:
       - main
@@ -27,79 +22,184 @@ permissions:
   contents: write
 
 env:
-  IMAGE_NAME: application
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REGISTRY: 893061519920.dkr.ecr.eu-west-2.amazonaws.com
 
 jobs:
-    build:
-        runs-on: ubuntu-latest
+  test:
+    name: Test ${{ matrix.service }}
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v7
-            
-            - name: Set up Go
-              uses: actions/setup-go@v7
-              with:
-                go-version: "1.25.1"
-                cache-dependency-path: application/go.sum
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - order-service
+          - inventory-service
+          - payment-service
+          - notification-service
+          - shipping-service
+          - dashboard-api
+          - scheduler
+          - worker
 
-            - name: Download Go Modules
-              working-directory: application
-              run: go mod download
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-            - name: Build Application
-              working-directory: application
-              run: go build -o api ./cmd/api
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.22"
 
-            - name: Run tests
-              working-directory: application
-              run: go test ./...
+      - name: Download Go modules
+        working-directory: services/${{ matrix.service }}
+        run: go mod download
 
-            - name: Configure AWS credentials
-              uses: aws-actions/configure-aws-credentials@v6
-              with:
-                role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-                aws-region: ${{ vars.AWS_REGION }}
+      - name: Build service
+        working-directory: services/${{ matrix.service }}
+        run: go build .
 
-            - name: Login to Amazon ECR
-              id: login-ecr
-              uses: aws-actions/amazon-ecr-login@v2
+      - name: Run tests
+        working-directory: services/${{ matrix.service }}
+        run: go test ./...
 
-            - name: Build Docker image
-              run: |
-                docker build \
-                -t ${{ env.IMAGE_NAME }}:latest \
-                -f application/Dockerfile \
-                application
+  security:
+    name: Security scan ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: test
 
-            - name: Tag Docker image
-              run: |
-                docker tag ${{ env.IMAGE_NAME }}:latest \
-                  ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - order-service
+          - inventory-service
+          - payment-service
+          - notification-service
+          - shipping-service
+          - dashboard-api
+          - scheduler
+          - worker
 
-                docker tag ${{ env.IMAGE_NAME }}:latest \
-                  ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-            - name: Push Docker image
-              run: |
-                docker push \
-                  ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+      - name: Scan source with Trivy
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: fs
+          scan-ref: services/${{ matrix.service }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
-                docker push \
-                  ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
+  build-and-push:
+    name: Build and push ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: security
 
-            - name: Update Kubernetes image tag
-              run: |
-                  sed -i \
-                    "s/newTag: .*/newTag: ${GITHUB_SHA}/" \
-                    terraform/infrastructure/application/kustomization.yaml
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - order-service
+          - inventory-service
+          - payment-service
+          - notification-service
+          - shipping-service
+          - dashboard-api
+          - scheduler
+          - worker
 
-                  git config user.name "github-actions[bot]"
-                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-                  git add terraform/infrastructure/application/kustomization.yaml
+      - name: Configure AWS credentials
+        if: github.event_name == 'push'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-                  git commit \
-                    -m "chore(cd): update application image to ${GITHUB_SHA} [skip ci]"
+      - name: Login to Amazon ECR
+        if: github.event_name == 'push'
+        uses: aws-actions/amazon-ecr-login@v2
 
-                  git push
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t "${{ env.ECR_REGISTRY }}/jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}" \
+            "services/${{ matrix.service }}"
+
+      - name: Scan container image
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: "${{ env.ECR_REGISTRY }}/jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}"
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Push image to ECR
+        if: github.event_name == 'push'
+        run: |
+          docker push \
+            "${{ env.ECR_REGISTRY }}/jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}"
+
+  update-manifests:
+    name: Update Kubernetes manifests
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Update image tags
+        run: |
+          for service in \
+            api-gateway \
+            order-service \
+            inventory-service \
+            payment-service \
+            notification-service \
+            shipping-service \
+            dashboard-api \
+            scheduler \
+            worker; do
+
+            sed -i \
+              "s#^\(\s*image: .*jenkins-eks-challenge-dev-${service}\):.*#\1:${GITHUB_SHA}#" \
+              "terraform/infrastructure/application/base/services/${service}/deployment.yaml"
+          done
+
+      - name: Validate Kustomize
+        run: |
+          kubectl kustomize terraform/infrastructure/application/base >/dev/null
+          kubectl kustomize terraform/infrastructure/application/overlays/dev >/dev/null
+          kubectl kustomize terraform/infrastructure/application/overlays/prod >/dev/null
+
+      - name: Commit manifest updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add terraform/infrastructure/application/base/services/*/deployment.yaml
+
+          if git diff --cached --quiet; then
+            echo "No manifest changes detected."
+            exit 0
+          fi
+
+          git commit \
+            -m "chore(cd): update service images to ${GITHUB_SHA} [skip ci]"
+
+          git push
