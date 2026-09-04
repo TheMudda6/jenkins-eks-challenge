@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	"os"
@@ -15,6 +17,27 @@ import (
 )
 
 var db *sql.DB
+
+var (
+	schedulerJobRuns = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "scheduler_job_runs_total",
+			Help: "Total number of scheduled job executions.",
+		},
+		[]string{"job"},
+	)
+	schedulerJobDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "scheduler_job_duration_seconds",
+			Help: "Duration of scheduled job executions in seconds.",
+		},
+		[]string{"job"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(schedulerJobRuns, schedulerJobDuration)
+}
 
 func main() {
 	dbURL := os.Getenv("DATABASE_URL")
@@ -40,16 +63,52 @@ func main() {
 	// Health check
 	go func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-			status := "ok"
-			if err := db.Ping(); err != nil {
-				status = "unhealthy"
-				w.WriteHeader(http.StatusServiceUnavailable)
-			}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "scheduler"})
-		})
+
+		httpRequests := prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "scheduler_http_requests_total",
+				Help: "Total number of HTTP requests to the scheduler health server.",
+			},
+			[]string{"route", "code", "method"},
+		)
+		httpDuration := prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name: "scheduler_http_request_duration_seconds",
+				Help: "HTTP request duration in seconds for the scheduler health server.",
+			},
+			[]string{"route", "code", "method"},
+		)
+		prometheus.MustRegister(httpRequests, httpDuration)
+
+		instrumentHandler := func(route string, handler http.Handler) http.Handler {
+			labels := prometheus.Labels{"route": route}
+			return promhttp.InstrumentHandlerDuration(
+				httpDuration.MustCurryWith(labels),
+				promhttp.InstrumentHandlerCounter(
+					httpRequests.MustCurryWith(labels),
+					handler,
+				),
+			)
+		}
+
+		mux.Handle("/livez", instrumentHandler("/livez", http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			},
+		)))
+		mux.Handle("/healthz", instrumentHandler("/healthz", http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				status := "ok"
+				if err := db.Ping(); err != nil {
+					status = "unhealthy"
+					w.WriteHeader(http.StatusServiceUnavailable)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "scheduler"})
+			},
+		)))
+		mux.Handle("/metrics", promhttp.Handler())
+
 		port := getEnv("HEALTH_PORT", "8091")
 		log.Printf("Scheduler health check on :%s", port)
 		http.ListenAndServe(":"+port, mux)
@@ -84,7 +143,10 @@ func runEvery(ctx context.Context, interval time.Duration, name string, fn func(
 
 	// Run immediately on start
 	log.Printf("Running job: %s", name)
+	start := time.Now()
+	schedulerJobRuns.WithLabelValues(name).Inc()
 	fn()
+	schedulerJobDuration.WithLabelValues(name).Observe(time.Since(start).Seconds())
 
 	for {
 		select {
@@ -93,7 +155,9 @@ func runEvery(ctx context.Context, interval time.Duration, name string, fn func(
 		case <-ticker.C:
 			log.Printf("Running job: %s", name)
 			start := time.Now()
+			schedulerJobRuns.WithLabelValues(name).Inc()
 			fn()
+			schedulerJobDuration.WithLabelValues(name).Observe(time.Since(start).Seconds())
 			log.Printf("Job '%s' completed in %s", name, time.Since(start))
 		}
 	}
