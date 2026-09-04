@@ -11,10 +11,48 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	_ "github.com/lib/pq"
 )
 
 var db *sql.DB
+
+var (
+	httpRequests = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests.",
+		},
+		[]string{"route", "code", "method"},
+	)
+
+	httpDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "http_request_duration_seconds",
+			Help: "HTTP request duration in seconds.",
+		},
+		[]string{"route", "code", "method"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(httpRequests)
+	prometheus.MustRegister(httpDuration)
+}
+
+func instrumentHandler(route string, handler http.Handler) http.Handler {
+	labels := prometheus.Labels{"route": route}
+
+	return promhttp.InstrumentHandlerDuration(
+		httpDuration.MustCurryWith(labels),
+		promhttp.InstrumentHandlerCounter(
+			httpRequests.MustCurryWith(labels),
+			handler,
+		),
+	)
+}
 
 func main() {
 	dbURL := os.Getenv("DATABASE_URL")
@@ -36,11 +74,14 @@ func main() {
 	migrate()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("/healthz", handleHealth)
-	mux.HandleFunc("/send", handleSend)
-	mux.HandleFunc("/history", handleHistory)
-	mux.HandleFunc("/templates", handleTemplates)
+	mux.Handle("/livez", instrumentHandler("/livez", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+	mux.Handle("/healthz", instrumentHandler("/healthz", http.HandlerFunc(handleHealth)))
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/send", instrumentHandler("/send", http.HandlerFunc(handleSend)))
+	mux.Handle("/history", instrumentHandler("/history", http.HandlerFunc(handleHistory)))
+	mux.Handle("/templates", instrumentHandler("/templates", http.HandlerFunc(handleTemplates)))
 
 	port := getEnv("PORT", "8084")
 	server := &http.Server{
