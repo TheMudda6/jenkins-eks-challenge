@@ -332,15 +332,7 @@ variable "route53_zone_id" {
   type        = string
 }
 
-variable "external_dns_role_name" {
-  description = "IAM Role name for ExternalDNS."
-  type        = string
-}
 
-variable "external_dns_policy_name" {
-  description = "IAM Policy name for ExternalDNS."
-  type        = string
-}
 
 # -----------------------------------------------------------------------------
 # cert-manager

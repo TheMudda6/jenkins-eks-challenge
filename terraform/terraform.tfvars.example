@@ -85,7 +85,5 @@ jenkins_hostname     = "jenkins.YOUR_DOMAIN"
 # -----------------------------------------------------------------------------
 
 route53_zone_id          = "ZXXXXXXXXXXXXXXX"
-external_dns_role_name   = "jenkins-external-dns-role"
-external_dns_policy_name = "jenkins-external-dns-policy"
 cert_manager_role_name   = "jenkins-cert-manager-role"
 cert_manager_policy_name = "jenkins-cert-manager-policy"

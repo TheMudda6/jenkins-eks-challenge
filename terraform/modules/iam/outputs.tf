@@ -38,10 +38,6 @@ output "github_actions_role_arn" {
 # Route 53 / ExternalDNS
 # -----------------------------------------------------------------------------
 
-output "external_dns_role_arn" {
-  value       = aws_iam_role.external_dns.arn
-  description = "ARN of the ExternalDNS IAM Role."
-}
 
 # -----------------------------------------------------------------------------
 # cert-manager
