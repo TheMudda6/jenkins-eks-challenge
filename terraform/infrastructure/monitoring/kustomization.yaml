@@ -11,3 +11,22 @@
 resources:
   - namespace.yaml
   - prometheus-stack.yaml
+  - api-gateway-servicemonitor.yaml
+  - order-service-servicemonitor.yaml
+  - inventory-service-servicemonitor.yaml
+  - payment-service-servicemonitor.yaml
+  - notification-service-servicemonitor.yaml
+  - shipping-service-servicemonitor.yaml
+  - worker-servicemonitor.yaml
+  - scheduler-servicemonitor.yaml
+  - dashboard-api-servicemonitor.yaml
+  - dashboards/api-gateway.yaml
+  - dashboards/order-service.yaml
+  - dashboards/inventory-service.yaml
+  - dashboards/payment-service.yaml
+  - dashboards/notification-service.yaml
+  - dashboards/shipping-service.yaml
+  - dashboards/dashboard-api.yaml
+  - dashboards/worker.yaml
+  - dashboards/scheduler.yaml
+  - prometheus-rules.yaml

@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-worker
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    k8s-sidecar-target-directory: "/tmp/dashboards"
+data:
+  worker.json: |
+    {
+      "uid": "ecommerce-worker",
+      "title": "E-Commerce / Worker",
+      "tags": [
+        "e-commerce",
+        "worker"
+      ],
+      "timezone": "utc",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "SQS Messages Received",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "targets": [
+            {
+              "expr": "rate(worker_sqs_messages_received_total{namespace=\"jenkins\",app=\"worker\"}[5m])",
+              "legendFormat": "messages/sec",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Events Processed",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "targets": [
+            {
+              "expr": "sum by (event_type) (rate(worker_events_processed_total{namespace=\"jenkins\",app=\"worker\"}[5m]))",
+              "legendFormat": "{{event_type}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "Event Processing Failures",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+          },
+          "targets": [
+            {
+              "expr": "sum by (event_type) (rate(worker_event_processing_failures_total{namespace=\"jenkins\",app=\"worker\"}[5m]))",
+              "legendFormat": "{{event_type}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "SQS Receive Errors",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+          },
+          "targets": [
+            {
+              "expr": "rate(worker_sqs_receive_errors_total{namespace=\"jenkins\",app=\"worker\"}[5m])",
+              "legendFormat": "errors/sec",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "SQS Delete Errors",
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 16
+          },
+          "targets": [
+            {
+              "expr": "rate(worker_sqs_delete_errors_total{namespace=\"jenkins\",app=\"worker\"}[5m])",
+              "legendFormat": "errors/sec",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          }
+        }
+      ]
+    }

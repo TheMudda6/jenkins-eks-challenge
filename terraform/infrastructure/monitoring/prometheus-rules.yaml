@@ -1,0 +1,76 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: e-commerce-alerts
+  namespace: monitoring
+  labels:
+    monitoring: prometheus
+spec:
+  groups:
+    - name: e-commerce-http
+      rules:
+        - alert: ECommerceHighHTTP5xxRate
+          expr: |
+            (
+              sum by (app) (
+                rate(http_requests_total{
+                  namespace="jenkins",
+                  app=~"api-gateway|order-service|inventory-service|payment-service|notification-service|shipping-service|dashboard-api",
+                  code=~"5.."
+                }[5m])
+              )
+              /
+              clamp_min(
+                sum by (app) (
+                  rate(http_requests_total{
+                    namespace="jenkins",
+                    app=~"api-gateway|order-service|inventory-service|payment-service|notification-service|shipping-service|dashboard-api"
+                  }[5m])
+                ),
+                0.1
+              )
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High HTTP 5xx error rate for {{ $labels.app }}"
+            description: "{{ $labels.app }} has returned more than 5% HTTP 5xx responses for at least 5 minutes."
+            runbook: "Inspect the affected service logs, recent deployment, downstream dependencies, and database/queue health."
+
+        - alert: ECommerceHighHTTPP95Latency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (app, le) (
+                rate(http_request_duration_seconds_bucket{
+                  namespace="jenkins",
+                  app=~"api-gateway|order-service|inventory-service|payment-service|notification-service|shipping-service|dashboard-api"
+                }[5m])
+              )
+            ) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High HTTP P95 latency for {{ $labels.app }}"
+            description: "{{ $labels.app }} has had HTTP P95 latency above 1 second for at least 10 minutes."
+            runbook: "Inspect service CPU/memory saturation, downstream calls, PostgreSQL/Redis latency, and recent deployment changes."
+
+    - name: e-commerce-worker
+      rules:
+        - alert: ECommerceWorkerEventProcessingFailures
+          expr: |
+            sum(
+              rate(worker_event_processing_failures_total{
+                namespace="jenkins",
+                app="worker"
+              }[5m])
+            ) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Worker event processing failures detected"
+            description: "The asynchronous worker has recorded event-processing failures continuously for at least 5 minutes."
+            runbook: "Inspect worker logs, SQS/DLQ depth, AWS permissions, and the downstream service/database involved in processing the failed event."
