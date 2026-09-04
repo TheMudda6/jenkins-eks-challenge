@@ -26,8 +26,41 @@ env:
   ECR_REGISTRY: 893061519920.dkr.ecr.eu-west-2.amazonaws.com
 
 jobs:
+  lint:
+    name: Lint ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - order-service
+          - inventory-service
+          - payment-service
+          - notification-service
+          - shipping-service
+          - dashboard-api
+          - scheduler
+          - worker
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.24"
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.4
+          working-directory: services/${{ matrix.service }}
+
   test:
     name: Test ${{ matrix.service }}
+    needs: lint
     runs-on: ubuntu-latest
 
     strategy:
@@ -133,17 +166,24 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            -t "${{ env.ECR_REGISTRY }}/jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}" \
+            -t "jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}" \
             "services/${{ matrix.service }}"
 
       - name: Scan container image
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          image-ref: "${{ env.ECR_REGISTRY }}/jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}"
+          image-ref: "jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}"
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
+
+      - name: Tag image for ECR
+        if: github.event_name == 'push'
+        run: |
+          docker tag \
+            "jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}" \
+            "${{ env.ECR_REGISTRY }}/jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}"
 
       - name: Push image to ECR
         if: github.event_name == 'push'
@@ -203,3 +243,8 @@ jobs:
             -m "chore(cd): update service images to ${GITHUB_SHA} [skip ci]"
 
           git push
+
+      - name: Confirm ArgoCD GitOps handoff
+        run: |
+          echo "Manifest commit pushed to ${GITHUB_REF_NAME}."
+          echo "ArgoCD platform-root will reconcile the repository automatically."
