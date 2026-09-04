@@ -17,11 +17,49 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	_ "github.com/lib/pq"
 )
 
 var db *sql.DB
 var sqsClient *sqs.Client
+
+var (
+	httpRequests = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests.",
+		},
+		[]string{"route", "code", "method"},
+	)
+
+	httpDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "http_request_duration_seconds",
+			Help: "HTTP request duration in seconds.",
+		},
+		[]string{"route", "code", "method"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(httpRequests)
+	prometheus.MustRegister(httpDuration)
+}
+
+func instrumentHandler(route string, handler http.Handler) http.Handler {
+	labels := prometheus.Labels{"route": route}
+
+	return promhttp.InstrumentHandlerDuration(
+		httpDuration.MustCurryWith(labels),
+		promhttp.InstrumentHandlerCounter(
+			httpRequests.MustCurryWith(labels),
+			handler,
+		),
+	)
+}
 
 type Order struct {
 	ID         int             `json:"id"`
@@ -85,10 +123,13 @@ func main() {
 	migrate()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("/healthz", handleHealth)
-	mux.HandleFunc("/", handleOrders)
-	mux.HandleFunc("/status", handleUpdateStatus)
+	mux.Handle("/livez", instrumentHandler("/livez", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+	mux.Handle("/healthz", instrumentHandler("/healthz", http.HandlerFunc(handleHealth)))
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/", instrumentHandler("/", http.HandlerFunc(handleOrders)))
+	mux.Handle("/status", instrumentHandler("/status", http.HandlerFunc(handleUpdateStatus)))
 
 	port := getEnv("PORT", "8081")
 	server := &http.Server{
