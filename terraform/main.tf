@@ -72,6 +72,8 @@ module "iam" {
 
   postgres_secret_arn = module.secrets.postgres_secret_arn
 
+  grafana_secret_arn = module.secrets.grafana_secret_arn
+
   # ---------------------------------------------------------------------------
   # Route 53 / ExternalDNS / cert-manager
   # ---------------------------------------------------------------------------
@@ -198,6 +200,7 @@ module "secrets" {
   source = "./modules/secrets"
 
   postgres_password = var.postgres_password
+  grafana_password  = var.grafana_password
 }
 
 # -----------------------------------------------------------------------------

@@ -273,6 +273,12 @@ variable "postgres_password" {
   sensitive   = true
 }
 
+variable "grafana_password" {
+  description = "Grafana administrator password."
+  type        = string
+  sensitive   = true
+}
+
 variable "namespace" {
   description = "Kubernetes namespace for application workloads."
   type        = string

@@ -18,7 +18,8 @@ data "aws_iam_policy_document" "external_secrets" {
     ]
 
     resources = [
-      var.postgres_secret_arn
+      var.postgres_secret_arn,
+      var.grafana_secret_arn
     ]
   }
 }

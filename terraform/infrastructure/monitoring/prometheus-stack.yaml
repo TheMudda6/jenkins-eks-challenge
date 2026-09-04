@@ -36,7 +36,8 @@ spec:
       values: |
         grafana:
           enabled: true
-          adminPassword: admin
+          admin:
+            existingSecret: grafana-secret
           persistence:
             enabled: true
             storageClassName: gp3

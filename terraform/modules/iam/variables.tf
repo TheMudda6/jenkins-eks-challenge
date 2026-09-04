@@ -151,6 +151,12 @@ variable "postgres_secret_arn" {
   description = "ARN of the PostgreSQL secret stored in AWS Secrets Manager."
   type        = string
 }
+
+variable "grafana_secret_arn" {
+  description = "ARN of the Grafana secret stored in AWS Secrets Manager."
+  type        = string
+}
+
 # -----------------------------------------------------------------------------
 # Route 53 / ExternalDNS
 # -----------------------------------------------------------------------------
