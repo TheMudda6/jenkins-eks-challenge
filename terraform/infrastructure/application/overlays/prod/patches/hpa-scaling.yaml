@@ -1,0 +1,62 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway
+  namespace: jenkins
+spec:
+  minReplicas: 2
+  maxReplicas: 10
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-service
+  namespace: jenkins
+spec:
+  minReplicas: 2
+  maxReplicas: 10
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: inventory-service
+  namespace: jenkins
+spec:
+  minReplicas: 2
+  maxReplicas: 10
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-service
+  namespace: jenkins
+spec:
+  minReplicas: 2
+  maxReplicas: 10
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notification-service
+  namespace: jenkins
+spec:
+  minReplicas: 2
+  maxReplicas: 10
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: shipping-service
+  namespace: jenkins
+spec:
+  minReplicas: 2
+  maxReplicas: 10
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: dashboard-api
+  namespace: jenkins
+spec:
+  minReplicas: 2
+  maxReplicas: 10

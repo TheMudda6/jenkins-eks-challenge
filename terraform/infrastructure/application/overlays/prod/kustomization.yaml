@@ -4,3 +4,6 @@
 
 resources:
   - ../../base
+
+patches:
+  - path: patches/hpa-scaling.yaml
