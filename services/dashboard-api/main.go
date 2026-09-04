@@ -13,6 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	_ "github.com/lib/pq"
 )
 
@@ -20,6 +23,41 @@ import (
 var staticFiles embed.FS
 
 var db *sql.DB
+
+var (
+	httpRequests = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests.",
+		},
+		[]string{"route", "code", "method"},
+	)
+
+	httpDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "http_request_duration_seconds",
+			Help: "HTTP request duration in seconds.",
+		},
+		[]string{"route", "code", "method"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(httpRequests)
+	prometheus.MustRegister(httpDuration)
+}
+
+func instrumentHandler(route string, handler http.Handler) http.Handler {
+	labels := prometheus.Labels{"route": route}
+
+	return promhttp.InstrumentHandlerDuration(
+		httpDuration.MustCurryWith(labels),
+		promhttp.InstrumentHandlerCounter(
+			httpRequests.MustCurryWith(labels),
+			handler,
+		),
+	)
+}
 
 func main() {
 	dbURL := os.Getenv("DATABASE_URL")
@@ -40,18 +78,22 @@ func main() {
 	waitForDB()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("/healthz", handleHealth)
-	mux.HandleFunc("/dashboard/healthz", handleHealth)
-	mux.HandleFunc("/dashboard/summary", handleSummary)
-	mux.HandleFunc("/dashboard/orders/stats", handleOrderStats)
-	mux.HandleFunc("/dashboard/revenue", handleRevenue)
-	mux.HandleFunc("/dashboard/inventory/alerts", handleInventoryAlerts)
-	mux.HandleFunc("/dashboard/shipping/overview", handleShippingOverview)
+	mux.Handle("/livez", instrumentHandler("/livez", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+	mux.Handle("/healthz", instrumentHandler("/healthz", http.HandlerFunc(handleHealth)))
+	mux.Handle("/dashboard/healthz", instrumentHandler("/dashboard/healthz", http.HandlerFunc(handleHealth)))
+	mux.Handle("/dashboard/summary", instrumentHandler("/dashboard/summary", http.HandlerFunc(handleSummary)))
+	mux.Handle("/dashboard/orders/stats", instrumentHandler("/dashboard/orders/stats", http.HandlerFunc(handleOrderStats)))
+	mux.Handle("/dashboard/revenue", instrumentHandler("/dashboard/revenue", http.HandlerFunc(handleRevenue)))
+	mux.Handle("/dashboard/inventory/alerts", instrumentHandler("/dashboard/inventory/alerts", http.HandlerFunc(handleInventoryAlerts)))
+	mux.Handle("/dashboard/shipping/overview", instrumentHandler("/dashboard/shipping/overview", http.HandlerFunc(handleShippingOverview)))
 
 	// Serve frontend UI
 	staticFS, _ := fs.Sub(staticFiles, "static")
-	mux.Handle("/", http.FileServer(http.FS(staticFS)))
+	mux.Handle("/", instrumentHandler("/", http.FileServer(http.FS(staticFS))))
+
+	mux.Handle("/metrics", promhttp.Handler())
 
 	port := getEnv("PORT", "8086")
 	server := &http.Server{
@@ -136,9 +178,9 @@ func handleSummary(w http.ResponseWriter, r *http.Request) {
 	db.QueryRow("SELECT COUNT(*) FROM shipments WHERE status NOT IN ('delivered', 'cancelled')").Scan(&activeShipments)
 
 	summary["orders"] = map[string]interface{}{
-		"total":      totalOrders,
-		"today":      ordersToday,
-		"by_status":  statusCounts,
+		"total":     totalOrders,
+		"today":     ordersToday,
+		"by_status": statusCounts,
 	}
 	summary["revenue"] = map[string]interface{}{
 		"total":    totalRevenue,
