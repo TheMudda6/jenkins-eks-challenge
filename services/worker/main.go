@@ -7,6 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqsTypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +16,51 @@ import (
 	"syscall"
 	"time"
 )
+
+var (
+	sqsMessagesReceived = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "worker_sqs_messages_received_total",
+			Help: "Total number of SQS messages received by the worker.",
+		},
+	)
+	eventsProcessed = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "worker_events_processed_total",
+			Help: "Total number of events successfully processed by the worker.",
+		},
+		[]string{"event_type"},
+	)
+	eventProcessingFailures = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "worker_event_processing_failures_total",
+			Help: "Total number of event processing failures.",
+		},
+		[]string{"event_type"},
+	)
+	sqsReceiveErrors = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "worker_sqs_receive_errors_total",
+			Help: "Total number of SQS receive errors.",
+		},
+	)
+	sqsDeleteErrors = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "worker_sqs_delete_errors_total",
+			Help: "Total number of SQS delete errors.",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(
+		sqsMessagesReceived,
+		eventsProcessed,
+		eventProcessingFailures,
+		sqsReceiveErrors,
+		sqsDeleteErrors,
+	)
+}
 
 // Event represents a message from SQS
 type Event struct {
@@ -49,11 +96,47 @@ func main() {
 	// Health check endpoint
 	go func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": "worker"})
-		})
+
+		httpRequests := prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "worker_http_requests_total",
+				Help: "Total number of HTTP requests to the worker health server.",
+			},
+			[]string{"route", "code", "method"},
+		)
+		httpDuration := prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name: "worker_http_request_duration_seconds",
+				Help: "HTTP request duration in seconds for the worker health server.",
+			},
+			[]string{"route", "code", "method"},
+		)
+		prometheus.MustRegister(httpRequests, httpDuration)
+
+		instrumentHandler := func(route string, handler http.Handler) http.Handler {
+			labels := prometheus.Labels{"route": route}
+			return promhttp.InstrumentHandlerDuration(
+				httpDuration.MustCurryWith(labels),
+				promhttp.InstrumentHandlerCounter(
+					httpRequests.MustCurryWith(labels),
+					handler,
+				),
+			)
+		}
+
+		mux.Handle("/livez", instrumentHandler("/livez", http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			},
+		)))
+		mux.Handle("/healthz", instrumentHandler("/healthz", http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": "worker"})
+			},
+		)))
+		mux.Handle("/metrics", promhttp.Handler())
+
 		port := getEnv("HEALTH_PORT", "8090")
 		log.Printf("Worker health check on :%s", port)
 		http.ListenAndServe(":"+port, mux)
@@ -85,6 +168,7 @@ func pollAndProcess(ctx context.Context, sqsClient *sqs.Client, queueURL string,
 
 		messages, err := receiveSQSMessages(ctx, sqsClient, queueURL)
 		if err != nil {
+			sqsReceiveErrors.Inc()
 			if ctx.Err() != nil {
 				log.Println("Worker stopped")
 				return
@@ -93,6 +177,8 @@ func pollAndProcess(ctx context.Context, sqsClient *sqs.Client, queueURL string,
 			time.Sleep(5 * time.Second)
 			continue
 		}
+
+		sqsMessagesReceived.Add(float64(len(messages)))
 
 		for _, message := range messages {
 			if message.Body == nil || message.ReceiptHandle == nil {
@@ -109,6 +195,7 @@ func pollAndProcess(ctx context.Context, sqsClient *sqs.Client, queueURL string,
 			log.Printf("Processing event: %s", event.Type)
 
 			if err := handleEvent(client, services, event); err != nil {
+				eventProcessingFailures.WithLabelValues(event.Type).Inc()
 				log.Printf("Failed to handle event %s: %v", event.Type, err)
 				// Do not delete the message. SQS will make it
 				// visible again and eventually move it to the DLQ.
@@ -119,10 +206,12 @@ func pollAndProcess(ctx context.Context, sqsClient *sqs.Client, queueURL string,
 				QueueUrl:      aws.String(queueURL),
 				ReceiptHandle: message.ReceiptHandle,
 			}); err != nil {
+				sqsDeleteErrors.Inc()
 				log.Printf("Failed to delete processed message %s: %v", event.Type, err)
 				continue
 			}
 
+			eventsProcessed.WithLabelValues(event.Type).Inc()
 			log.Printf("Successfully processed and deleted: %s", event.Type)
 		}
 	}
