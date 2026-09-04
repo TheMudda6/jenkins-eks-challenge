@@ -1,15 +1,8 @@
 # -----------------------------------------------------------------------------
 # Application Kustomization
 #
-# The legacy monolith is retained temporarily while the nine-service
-# architecture is migrated. The dev overlay is the active application stack.
+# The dev overlay is the active nine-service application stack.
 # -----------------------------------------------------------------------------
 
 resources:
-  # Existing monolith - retained temporarily during the nine-service migration.
-  - legacy/application-deployment.yaml
-  - legacy/application-service.yaml
-  - legacy/application-serviceaccount.yaml
-
-  # New nine-service architecture.
   - overlays/dev
