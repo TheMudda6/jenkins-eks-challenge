@@ -28,9 +28,6 @@ spec:
             serviceMonitorSelector:
               matchLabels:
                 monitoring: prometheus
-            serviceMonitorNamespaceSelector:
-              matchNames:
-                - monitoring
             retention: 7d
             storageSpec:
               volumeClaimTemplate:
