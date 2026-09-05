@@ -126,6 +126,10 @@ kubectl wait \
 
 echo "✓ ArgoCD is ready."
 
+echo "Installing Volume Snapshot infrastructure..."
+bash infrastructure/snapshot/install.sh
+echo "✓ Volume Snapshot infrastructure ready."
+
 kubectl apply -f infrastructure/argocd/root-application.yaml
 
 echo "✓ ArgoCD platform-root Application applied."
