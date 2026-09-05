@@ -1,21 +1,3 @@
-# -----------------------------------------------------------------------------
-# Prometheus Stack ArgoCD Application
-#
-# Purpose:
-# Defines the ArgoCD Application responsible for deploying the
-# kube-prometheus-stack monitoring platform.
-#
-# The stack provides Prometheus for metrics collection, Grafana for
-# visualization and Alertmanager for alert management.
-#
-# Persistent storage is provided through the gp3 StorageClass for both
-# Grafana and Prometheus.
-#
-# Note:
-# The current Grafana administrator password is a development default and
-# should be replaced with securely managed credentials in production.
-# -----------------------------------------------------------------------------
-
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -23,10 +5,8 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "1"
-
 spec:
   project: default
-
   source:
     chart: kube-prometheus-stack
     repoURL: https://prometheus-community.github.io/helm-charts
@@ -62,11 +42,9 @@ spec:
 
         alertmanager:
           enabled: true
-
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
-
   syncPolicy:
     automated:
       prune: true

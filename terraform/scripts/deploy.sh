@@ -126,7 +126,7 @@ kubectl wait \
 
 echo "✓ ArgoCD is ready."
 
-kubectl apply -f terraform/infrastructure/argocd/root-application.yaml
+kubectl apply -f infrastructure/argocd/root-application.yaml
 
 echo "✓ ArgoCD platform-root Application applied."
 
