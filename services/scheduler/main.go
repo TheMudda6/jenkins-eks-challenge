@@ -50,7 +50,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Failed to close database: %v", err)
+		}
+	}()
 
 	db.SetMaxOpenConns(5)
 	db.SetMaxIdleConns(2)
@@ -104,14 +108,18 @@ func main() {
 					w.WriteHeader(http.StatusServiceUnavailable)
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "scheduler"})
+				if err := json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "scheduler"}); err != nil {
+					log.Printf("Failed to encode health response: %v", err)
+				}
 			},
 		)))
 		mux.Handle("/metrics", promhttp.Handler())
 
 		port := getEnv("HEALTH_PORT", "8091")
 		log.Printf("Scheduler health check on :%s", port)
-		http.ListenAndServe(":"+port, mux)
+		if err := http.ListenAndServe(":"+port, mux); err != nil {
+			log.Printf("HTTP server stopped: %v", err)
+		}
 	}()
 
 	// Graceful shutdown
@@ -175,25 +183,43 @@ func expireReservations() {
 		log.Printf("expire_reservations query error: %v", err)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Failed to close reservation rows: %v", err)
+		}
+	}()
 
 	count := 0
 	for rows.Next() {
 		var orderID int
 		var productID string
 		var quantity int
-		rows.Scan(&orderID, &productID, &quantity)
+		if err := rows.Scan(&orderID, &productID, &quantity); err != nil {
+			log.Printf("expire_reservations scan error: %v", err)
+			continue
+		}
 
 		tx, err := db.Begin()
 		if err != nil {
 			log.Printf("expire_reservations begin error: %v", err)
 			continue
 		}
-		tx.Exec("UPDATE products SET reserved = GREATEST(reserved - $1, 0), updated_at = NOW() WHERE id = $2",
-			quantity, productID)
-		tx.Exec("UPDATE reservations SET status = 'expired' WHERE order_id = $1 AND product_id = $2 AND status = 'active'",
-			orderID, productID)
-		tx.Commit()
+		if _, err := tx.Exec("UPDATE products SET reserved = GREATEST(reserved - $1, 0), updated_at = NOW() WHERE id = $2",
+			quantity, productID); err != nil {
+			log.Printf("expire_reservations product update error: %v", err)
+			_ = tx.Rollback()
+			continue
+		}
+		if _, err := tx.Exec("UPDATE reservations SET status = 'expired' WHERE order_id = $1 AND product_id = $2 AND status = 'active'",
+			orderID, productID); err != nil {
+			log.Printf("expire_reservations reservation update error: %v", err)
+			_ = tx.Rollback()
+			continue
+		}
+		if err := tx.Commit(); err != nil {
+			log.Printf("expire_reservations commit error: %v", err)
+			return
+		}
 		count++
 	}
 
@@ -215,16 +241,26 @@ func detectAbandonedOrders() {
 		log.Printf("abandoned_carts query error: %v", err)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Failed to close abandoned orders rows: %v", err)
+		}
+	}()
 
 	count := 0
 	for rows.Next() {
 		var orderID int
 		var customerID string
-		rows.Scan(&orderID, &customerID)
+		if err := rows.Scan(&orderID, &customerID); err != nil {
+			log.Printf("abandoned_carts scan error: %v", err)
+			continue
+		}
 
 		// Cancel the order
-		db.Exec("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1", orderID)
+		if _, err := db.Exec("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1", orderID); err != nil {
+			log.Printf("Failed to cancel abandoned order %d: %v", orderID, err)
+			continue
+		}
 
 		// Publish cancellation event (would trigger inventory release via worker)
 		log.Printf("Cancelled abandoned order #%d (customer: %s)", orderID, customerID)
@@ -241,11 +277,15 @@ func retryFailedPayments() {
 	cutoff := time.Now().Add(-1 * time.Hour)
 
 	var count int
-	db.QueryRow(
+
+	if err := db.QueryRow(
 		`SELECT COUNT(*) FROM payments
 		 WHERE status = 'failed' AND created_at > $1`,
 		cutoff,
-	).Scan(&count)
+	).Scan(&count); err != nil {
+		log.Printf("Failed to query failed payments: %v", err)
+		return
+	}
 
 	if count > 0 {
 		log.Printf("Found %d failed payments eligible for retry", count)
@@ -261,10 +301,22 @@ func generateDigest() {
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 
-	db.QueryRow("SELECT COUNT(*) FROM orders WHERE created_at >= $1", today).Scan(&totalOrders)
-	db.QueryRow("SELECT COUNT(*) FROM orders WHERE status = 'pending'").Scan(&pendingOrders)
-	db.QueryRow("SELECT COUNT(*) FROM orders WHERE status = 'delivered' AND updated_at >= $1", today).Scan(&completedOrders)
-	db.QueryRow("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND created_at >= $1", today).Scan(&totalRevenue)
+	if err := db.QueryRow("SELECT COUNT(*) FROM orders WHERE created_at >= $1", today).Scan(&totalOrders); err != nil {
+		log.Printf("Failed to query total orders: %v", err)
+		return
+	}
+	if err := db.QueryRow("SELECT COUNT(*) FROM orders WHERE status = 'pending'").Scan(&pendingOrders); err != nil {
+		log.Printf("Failed to query pending orders: %v", err)
+		return
+	}
+	if err := db.QueryRow("SELECT COUNT(*) FROM orders WHERE status = 'delivered' AND updated_at >= $1", today).Scan(&completedOrders); err != nil {
+		log.Printf("Failed to query completed orders: %v", err)
+		return
+	}
+	if err := db.QueryRow("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND created_at >= $1", today).Scan(&totalRevenue); err != nil {
+		log.Printf("Failed to query total revenue: %v", err)
+		return
+	}
 
 	log.Printf("Daily digest - Orders today: %d, Pending: %d, Completed: %d, Revenue: %.2f",
 		totalOrders, pendingOrders, completedOrders, totalRevenue)
