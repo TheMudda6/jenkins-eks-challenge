@@ -113,7 +113,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Failed to close database: %v", err)
+		}
+	}()
 
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
@@ -200,7 +204,9 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "order-service"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "order-service"}); err != nil {
+		log.Printf("Failed to encode health response: %v", err)
+	}
 }
 
 func handleOrders(w http.ResponseWriter, r *http.Request) {
@@ -266,11 +272,13 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Record event
-	db.Exec(
+	if _, err := db.Exec(
 		`INSERT INTO order_events (order_id, event_type, new_status)
 		 VALUES ($1, 'order_created', 'pending')`,
 		orderID,
-	)
+	); err != nil {
+		log.Printf("Failed to record order event: %v", err)
+	}
 
 	// Publish to SQS for downstream services (inventory reservation, etc.)
 	publishEvent("order.created", map[string]interface{}{
@@ -281,13 +289,13 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		"currency":    currency,
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"id":     orderID,
 		"status": "pending",
 		"total":  total,
-	})
+	}); err != nil {
+		log.Printf("Failed to encode order response: %v", err)
+	}
 }
 
 func listOrders(w http.ResponseWriter, r *http.Request) {
@@ -306,7 +314,6 @@ func listOrders(w http.ResponseWriter, r *http.Request) {
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argN)
 		args = append(args, status)
-		argN++
 	}
 	query += " ORDER BY created_at DESC LIMIT 100"
 
@@ -315,7 +322,11 @@ func listOrders(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "query failed", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("failed to close rows: %v", err)
+		}
+	}()
 
 	orders := []Order{}
 	for rows.Next() {
@@ -332,7 +343,9 @@ func listOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(orders)
+	if err := json.NewEncoder(w).Encode(orders); err != nil {
+		log.Printf("failed to encode orders: %v", err)
+	}
 }
 
 func getOrder(w http.ResponseWriter, r *http.Request, id string) {
@@ -348,7 +361,9 @@ func getOrder(w http.ResponseWriter, r *http.Request, id string) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(o)
+	if err := json.NewEncoder(w).Encode(o); err != nil {
+		log.Printf("failed to encode order: %v", err)
+	}
 }
 
 func handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
@@ -403,11 +418,13 @@ func handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Record event
-	db.Exec(
+	if _, err := db.Exec(
 		`INSERT INTO order_events (order_id, event_type, old_status, new_status)
-		 VALUES ($1, 'status_changed', $2, $3)`,
+     	VALUES ($1, 'status_changed', $2, $3)`,
 		req.OrderID, currentStatus, req.NewStatus,
-	)
+	); err != nil {
+		log.Printf("failed to record order event: %v", err)
+	}
 
 	// Publish event
 	publishEvent("order.status_changed", map[string]interface{}{
@@ -417,11 +434,13 @@ func handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"order_id":   req.OrderID,
 		"old_status": currentStatus,
 		"new_status": req.NewStatus,
-	})
+	}); err != nil {
+		log.Printf("failed to encode response: %v", err)
+	}
 }
 
 func publishEvent(eventType string, payload map[string]interface{}) {
@@ -457,7 +476,9 @@ func publishEvent(eventType string, payload map[string]interface{}) {
 func httpError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		log.Printf("failed to encode error response: %v", err)
+	}
 }
 
 func getEnv(key, fallback string) string {
