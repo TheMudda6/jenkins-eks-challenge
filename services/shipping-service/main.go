@@ -80,7 +80,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Failed to close database: %v", err)
+		}
+	}()
 
 	db.SetMaxOpenConns(15)
 	db.SetMaxIdleConns(3)
@@ -176,7 +180,9 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "shipping-service"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "shipping-service"}); err != nil {
+		log.Printf("Failed to encode health response: %v", err)
+	}
 }
 
 func handleShipments(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +197,11 @@ func handleShipments(w http.ResponseWriter, r *http.Request) {
 			httpError(w, "query failed", http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				log.Printf("Failed to close shipment rows: %v", err)
+			}
+		}()
 
 		type ShipmentSummary struct {
 			ID                int    `json:"id"`
@@ -210,8 +220,13 @@ func handleShipments(w http.ResponseWriter, r *http.Request) {
 		for rows.Next() {
 			var s ShipmentSummary
 			var estDel, tracking sql.NullString
-			rows.Scan(&s.ID, &s.OrderID, &s.Carrier, &tracking, &s.Status, &s.RecipientName,
-				&s.City, &s.Country, &estDel, &s.CreatedAt)
+
+			if err := rows.Scan(&s.ID, &s.OrderID, &s.Carrier, &tracking, &s.Status,
+				&s.RecipientName, &s.City, &s.Country, &estDel, &s.CreatedAt); err != nil {
+				httpError(w, "failed to read shipment summary", http.StatusInternalServerError)
+				return
+			}
+
 			if tracking.Valid {
 				s.TrackingNumber = tracking.String
 			}
@@ -222,7 +237,9 @@ func handleShipments(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(shipments)
+		if err := json.NewEncoder(w).Encode(shipments); err != nil {
+			log.Printf("Failed to encode shipment summary: %v", err)
+		}
 
 	case http.MethodPost:
 		createShipment(w, r)
@@ -282,11 +299,14 @@ func createShipment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Initial tracking event
-	db.Exec(
+	if _, err := db.Exec(
 		`INSERT INTO tracking_events (shipment_id, status, location, description, occurred_at)
 		 VALUES ($1, 'label_created', $2, 'Shipping label created', NOW())`,
 		shipmentID, req.City,
-	)
+	); err != nil {
+		httpError(w, "failed to create tracking event", http.StatusInternalServerError)
+		return
+	}
 
 	publishEvent("shipment.created", map[string]interface{}{
 		"shipment_id":     shipmentID,
@@ -297,12 +317,14 @@ func createShipment(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"shipment_id":        shipmentID,
 		"tracking_number":    trackingNumber,
 		"carrier":            carrier,
 		"estimated_delivery": estimatedDelivery.Format("2006-01-02"),
-	})
+	}); err != nil {
+		log.Printf("Failed to encode shipment response: %v", err)
+	}
 }
 
 func handleShipment(w http.ResponseWriter, r *http.Request) {
@@ -340,7 +362,9 @@ func handleShipment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s)
+	if err := json.NewEncoder(w).Encode(s); err != nil {
+		log.Printf("Failed to encode shipment response: %v", err)
+	}
 }
 
 func handleTrack(w http.ResponseWriter, r *http.Request) {
@@ -370,7 +394,11 @@ func handleTrack(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "query failed", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Failed to close tracking event rows: %v", err)
+		}
+	}()
 
 	type Event struct {
 		Status      string `json:"status"`
@@ -382,16 +410,21 @@ func handleTrack(w http.ResponseWriter, r *http.Request) {
 	events := []Event{}
 	for rows.Next() {
 		var e Event
-		rows.Scan(&e.Status, &e.Location, &e.Description, &e.OccurredAt)
+		if err := rows.Scan(&e.Status, &e.Location, &e.Description, &e.OccurredAt); err != nil {
+			httpError(w, "failed to read tracking event", http.StatusInternalServerError)
+			return
+		}
 		events = append(events, e)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"tracking_number": tracking,
 		"current_status":  status,
 		"events":          events,
-	})
+	}); err != nil {
+		log.Printf("Failed to encode tracking response: %v", err)
+	}
 }
 
 func handleCarrierWebhook(w http.ResponseWriter, r *http.Request) {
@@ -422,20 +455,33 @@ func handleCarrierWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update shipment status
-	db.Exec("UPDATE shipments SET status = $1, updated_at = NOW() WHERE id = $2", req.Status, shipmentID)
+	if _, err := db.Exec("UPDATE shipments SET status = $1, updated_at = NOW() WHERE id = $2", req.Status, shipmentID); err != nil {
+		httpError(w, "failed to update shipment status", http.StatusInternalServerError)
+		return
+	}
 
-	if req.Status == "delivered" {
-		db.Exec("UPDATE shipments SET delivered_at = NOW() WHERE id = $1", shipmentID)
-	} else if req.Status == "in_transit" {
-		db.Exec("UPDATE shipments SET shipped_at = COALESCE(shipped_at, NOW()) WHERE id = $1", shipmentID)
+	switch req.Status {
+	case "delivered":
+		if _, err := db.Exec("UPDATE shipments SET delivered_at = NOW() WHERE id = $1", shipmentID); err != nil {
+			httpError(w, "failed to update delivery timestamp", http.StatusInternalServerError)
+			return
+		}
+	case "in_transit":
+		if _, err := db.Exec("UPDATE shipments SET shipped_at = COALESCE(shipped_at, NOW()) WHERE id = $1", shipmentID); err != nil {
+			httpError(w, "failed to update shipping timestamp", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Record tracking event
-	db.Exec(
+	if _, err := db.Exec(
 		`INSERT INTO tracking_events (shipment_id, status, location, description, occurred_at)
 		 VALUES ($1, $2, $3, $4, NOW())`,
 		shipmentID, req.Status, req.Location, req.Description,
-	)
+	); err != nil {
+		httpError(w, "failed to record tracking event", http.StatusInternalServerError)
+		return
+	}
 
 	publishEvent("shipment."+req.Status, map[string]interface{}{
 		"shipment_id":     shipmentID,
@@ -446,7 +492,9 @@ func handleCarrierWebhook(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "accepted"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "accepted"}); err != nil {
+		log.Printf("Failed to encode webhook response: %v", err)
+	}
 }
 
 func generateTrackingNumber(carrier string) string {
@@ -494,7 +542,9 @@ func publishEvent(eventType string, payload map[string]interface{}) {
 func httpError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		log.Printf("Failed to encode error response: %v", err)
+	}
 }
 
 func getEnv(key, fallback string) string {
