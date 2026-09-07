@@ -80,7 +80,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Failed to close database: %v", err)
+		}
+	}()
 
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
@@ -170,7 +174,9 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "payment-service"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "payment-service"}); err != nil {
+		log.Printf("Failed to encode health response: %v", err)
+	}
 }
 
 func handleCharge(w http.ResponseWriter, r *http.Request) {
@@ -213,7 +219,11 @@ func handleCharge(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "transaction failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Printf("Failed to rollback transaction: %v", err)
+		}
+	}()
 
 	_, err = tx.Exec(
 		`INSERT INTO payments (id, order_id, customer_id, amount, currency, status, method)
@@ -227,19 +237,28 @@ func handleCharge(w http.ResponseWriter, r *http.Request) {
 
 	if status == "completed" {
 		// Double-entry: debit customer, credit revenue
-		tx.Exec(
+		if _, err := tx.Exec(
 			`INSERT INTO ledger_entries (payment_id, entry_type, debit, currency, description)
-			 VALUES ($1, 'charge', $2, $3, $4)`,
+	 		VALUES ($1, 'charge', $2, $3, $4)`,
 			paymentID, req.Amount, currency, fmt.Sprintf("Order #%d payment", req.OrderID),
-		)
-		tx.Exec(
+		); err != nil {
+			httpError(w, "failed to create debit ledger entry", http.StatusInternalServerError)
+			return
+		}
+		if _, err := tx.Exec(
 			`INSERT INTO ledger_entries (payment_id, entry_type, credit, currency, description)
 			 VALUES ($1, 'revenue', $2, $3, $4)`,
 			paymentID, req.Amount, currency, fmt.Sprintf("Order #%d revenue", req.OrderID),
-		)
+		); err != nil {
+			httpError(w, "failed to create credit ledger entry", http.StatusInternalServerError)
+			return
+		}
 	}
 
-	tx.Commit()
+	if err := tx.Commit(); err != nil {
+		httpError(w, "failed to commit payment transaction", http.StatusInternalServerError)
+		return
+	}
 
 	// Publish event
 	publishEvent("payment."+status, map[string]interface{}{
@@ -258,13 +277,15 @@ func handleCharge(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"payment_id": paymentID,
 		"order_id":   req.OrderID,
 		"amount":     req.Amount,
 		"currency":   currency,
 		"status":     status,
-	})
+	}); err != nil {
+		log.Printf("Failed to encode charge response: %v", err)
+	}
 }
 
 func handleRefund(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +334,11 @@ func handleRefund(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "transaction failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Printf("Failed to rollback transaction: %v", err)
+		}
+	}()
 
 	_, err = tx.Exec(
 		`INSERT INTO payments (id, order_id, customer_id, amount, currency, status, method, reference)
@@ -326,16 +351,25 @@ func handleRefund(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reverse ledger entries
-	tx.Exec(
+	if _, err := tx.Exec(
 		`INSERT INTO ledger_entries (payment_id, entry_type, credit, currency, description)
 		 VALUES ($1, 'refund', $2, $3, $4)`,
 		refundID, refundAmount, currency, fmt.Sprintf("Refund for payment %s: %s", req.PaymentID, req.Reason),
-	)
+	); err != nil {
+		httpError(w, "failed to create refund ledger entry", http.StatusInternalServerError)
+		return
+	}
 
 	if refundAmount >= originalAmount {
-		tx.Exec("UPDATE payments SET status = 'refunded', updated_at = NOW() WHERE id = $1", req.PaymentID)
+		if _, err := tx.Exec("UPDATE payments SET status = 'refunded', updated_at = NOW() WHERE id = $1", req.PaymentID); err != nil {
+			httpError(w, "failed to update payment status", http.StatusInternalServerError)
+			return
+		}
 	} else {
-		tx.Exec("UPDATE payments SET status = 'partially_refunded', updated_at = NOW() WHERE id = $1", req.PaymentID)
+		if _, err := tx.Exec("UPDATE payments SET status = 'partially_refunded', updated_at = NOW() WHERE id = $1", req.PaymentID); err != nil {
+			httpError(w, "failed to update payment status", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -352,12 +386,14 @@ func handleRefund(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"refund_id":  refundID,
 		"payment_id": req.PaymentID,
 		"amount":     refundAmount,
 		"status":     "completed",
-	})
+	}); err != nil {
+		log.Printf("Failed to encode refund response: %v", err)
+	}
 }
 
 func handleLedger(w http.ResponseWriter, r *http.Request) {
@@ -369,7 +405,11 @@ func handleLedger(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "query failed", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Failed to close ledger rows: %v", err)
+		}
+	}()
 
 	type Entry struct {
 		ID          int     `json:"id"`
@@ -385,12 +425,17 @@ func handleLedger(w http.ResponseWriter, r *http.Request) {
 	entries := []Entry{}
 	for rows.Next() {
 		var e Entry
-		rows.Scan(&e.ID, &e.PaymentID, &e.EntryType, &e.Debit, &e.Credit, &e.Currency, &e.Description, &e.CreatedAt)
+		if err := rows.Scan(&e.ID, &e.PaymentID, &e.EntryType, &e.Debit, &e.Credit, &e.Currency, &e.Description, &e.CreatedAt); err != nil {
+			httpError(w, "failed to read ledger entry", http.StatusInternalServerError)
+			return
+		}
 		entries = append(entries, e)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(entries)
+	if err := json.NewEncoder(w).Encode(entries); err != nil {
+		log.Printf("Failed to encode ledger response: %v", err)
+	}
 }
 
 func handleBalance(w http.ResponseWriter, r *http.Request) {
@@ -401,23 +446,31 @@ func handleBalance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var totalCharged, totalRefunded float64
-	db.QueryRow(
+	if err := db.QueryRow(
 		"SELECT COALESCE(SUM(amount), 0) FROM payments WHERE customer_id = $1 AND status IN ('completed', 'partially_refunded', 'refunded') AND (method IS NULL OR method != 'refund')",
 		customerID,
-	).Scan(&totalCharged)
+	).Scan(&totalCharged); err != nil {
+		httpError(w, "failed to calculate charged balance", http.StatusInternalServerError)
+		return
+	}
 
-	db.QueryRow(
+	if err := db.QueryRow(
 		"SELECT COALESCE(SUM(amount), 0) FROM payments WHERE customer_id = $1 AND method = 'refund'",
 		customerID,
-	).Scan(&totalRefunded)
+	).Scan(&totalRefunded); err != nil {
+		httpError(w, "failed to calculate refunded balance", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"customer_id":    customerID,
 		"total_charged":  totalCharged,
 		"total_refunded": totalRefunded,
 		"net":            totalCharged - totalRefunded,
-	})
+	}); err != nil {
+		log.Printf("Failed to encode balance response: %v", err)
+	}
 }
 
 func generatePaymentID() string {
@@ -456,7 +509,9 @@ func publishEvent(eventType string, payload map[string]interface{}) {
 func httpError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		log.Printf("Failed to encode error response: %v", err)
+	}
 }
 
 func getEnv(key, fallback string) string {
