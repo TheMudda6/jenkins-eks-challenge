@@ -126,14 +126,6 @@ kubectl wait \
 
 echo "✓ ArgoCD is ready."
 
-echo "Installing Volume Snapshot infrastructure..."
-bash infrastructure/snapshot/install.sh
-echo "✓ Volume Snapshot infrastructure ready."
-
-kubectl apply -f infrastructure/argocd/root-application.yaml
-
-echo "✓ ArgoCD platform-root Application applied."
-
 kubectl wait \
   --for=condition=Available \
   deployment/karpenter \
@@ -165,6 +157,14 @@ kubectl wait \
   --timeout=300s
 
 echo "✓ External Secrets Operator is ready."
+
+echo "Installing Volume Snapshot infrastructure..."
+bash infrastructure/snapshot/install.sh
+echo "✓ Volume Snapshot infrastructure ready."
+
+kubectl apply -f infrastructure/argocd/root-application.yaml
+
+echo "✓ ArgoCD platform-root Application applied."
 
 # ------------------------------------------------------------
 # Verify ArgoCD GitOps root application
@@ -207,13 +207,14 @@ echo
 echo "Checking required Applications..."
 
 for application in \
-  e-commerce-dev \
-  e-commerce-prod \
-  postgres \
-  redis \
-  secrets \
-  storage \
-  monitoring
+e-commerce-dev \
+e-commerce-prod \
+postgres \
+redis \
+secrets \
+storage \
+monitoring \
+monitoring-stack
 do
   if ! kubectl get application "$application" -n argocd >/dev/null 2>&1; then
     echo "ERROR: ArgoCD Application '$application' was not created."
@@ -251,13 +252,52 @@ kubectl wait \
 echo "✓ Redis is ready."
 
 echo
-echo "Application deployments:"
+echo "Waiting for E-Commerce application deployments..."
 
+for deployment in \
+  api-gateway \
+  order-service \
+  inventory-service \
+  payment-service \
+  notification-service \
+  shipping-service \
+  worker \
+  scheduler \
+  dashboard-api
+do
+  echo "Waiting for $deployment..."
+
+  if ! kubectl wait \
+    --for=condition=Available \
+    "deployment/$deployment" \
+    -n jenkins \
+    --timeout=300s
+  then
+    echo
+    echo "✗ $deployment failed to become Available."
+    echo
+    echo "Deployment status:"
+    kubectl get deployment "$deployment" -n jenkins
+    echo
+    echo "Pods:"
+    kubectl get pods -n jenkins -l "app=$deployment" -o wide
+    echo
+    echo "Recent events:"
+    kubectl get events -n jenkins \
+      --sort-by='.lastTimestamp' \
+      | tail -30
+    exit 1
+  fi
+
+  echo "✓ $deployment is ready."
+done
+
+echo
+echo "Application deployments:"
 kubectl get deployments -n jenkins
 
 echo
 echo "Application pods:"
-
 kubectl get pods -n jenkins
 
 echo
@@ -272,12 +312,33 @@ kubectl get services -n jenkins
 print_banner "Verifying Monitoring"
 
 kubectl get servicemonitors -n monitoring
-
 kubectl get prometheusrules -n monitoring
 
+echo
+echo "Waiting for Prometheus..."
+kubectl wait \
+  --for=condition=Available \
+  deployment/prometheus-stack-kube-prom-prometheus \
+  -n monitoring \
+  --timeout=300s
+
+echo "✓ Prometheus is ready."
+
+echo
+echo "Waiting for Grafana..."
+kubectl wait \
+  --for=condition=Available \
+  deployment/prometheus-stack-grafana \
+  -n monitoring \
+  --timeout=300s
+
+echo "✓ Grafana is ready."
+
+echo
+echo "Monitoring pods:"
 kubectl get pods -n monitoring
 
-echo "✓ Monitoring resources verified."
+echo "✓ Monitoring stack is ready."
 
 # ------------------------------------------------------------
 # Final platform status

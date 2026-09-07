@@ -114,29 +114,48 @@ if [[ "$CLUSTER_EXISTS" == true ]]; then
       -n argocd \
       --ignore-not-found=true
 
-    echo "✓ platform-root deletion requested."
+echo "✓ platform-root deletion requested."
 
-    echo
-    echo "Waiting for ArgoCD child Applications to disappear..."
+echo
+echo "Deleting ArgoCD child Applications..."
 
-    for application in \
-      e-commerce-dev \
-      e-commerce-prod \
-      postgres \
-      redis \
-      secrets \
-      storage \
-      monitoring
-    do
-      kubectl wait \
-        --for=delete \
-        "application/$application" \
-        -n argocd \
-        --timeout=120s \
-        2>/dev/null || true
-    done
+for application in \
+  e-commerce-dev \
+  e-commerce-prod \
+  postgres \
+  redis \
+  secrets \
+  storage \
+  monitoring \
+  monitoring-stack
+do
+  kubectl delete application "$application" \
+    -n argocd \
+    --ignore-not-found=true
+done
 
-    echo "✓ ArgoCD Applications released."
+echo
+echo "Waiting for ArgoCD child Applications to disappear..."
+
+for application in \
+  e-commerce-dev \
+  e-commerce-prod \
+  postgres \
+  redis \
+  secrets \
+  storage \
+  monitoring \
+  monitoring-stack
+do
+  kubectl wait \
+    --for=delete \
+    "application/$application" \
+    -n argocd \
+    --timeout=120s \
+    2>/dev/null || true
+done
+
+echo "✓ ArgoCD Applications released."
 
   else
 
