@@ -132,14 +132,18 @@ func main() {
 		mux.Handle("/healthz", instrumentHandler("/healthz", http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": "worker"})
+				if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": "worker"}); err != nil {
+					log.Printf("Failed to encode health response: %v", err)
+				}
 			},
 		)))
 		mux.Handle("/metrics", promhttp.Handler())
 
 		port := getEnv("HEALTH_PORT", "8090")
 		log.Printf("Worker health check on :%s", port)
-		http.ListenAndServe(":"+port, mux)
+		if err := http.ListenAndServe(":"+port, mux); err != nil && err != http.ErrServerClosed {
+			log.Printf("Health server error: %v", err)
+		}
 	}()
 
 	// Graceful shutdown

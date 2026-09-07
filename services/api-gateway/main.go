@@ -121,7 +121,9 @@ func main() {
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": "api-gateway"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": "api-gateway"}); err != nil {
+		log.Printf("Failed to encode health response: %v", err)
+	}
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +157,9 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
+	if err := json.NewEncoder(w).Encode(map[string]string{"token": tokenString}); err != nil {
+		log.Printf("Failed to encode login response: %v", err)
+	}
 }
 
 func handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -196,11 +200,13 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "registered",
 		"email":   req.Email,
 		"token":   tokenString,
-	})
+	}); err != nil {
+		log.Printf("Failed to encode register response: %v", err)
+	}
 }
 
 func handleProxy(w http.ResponseWriter, r *http.Request) {
@@ -310,7 +316,9 @@ func validateToken(r *http.Request) (jwt.MapClaims, error) {
 func httpError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		log.Printf("Failed to encode error response: %v", err)
+	}
 }
 
 func getEnv(key, fallback string) string {
@@ -343,6 +351,8 @@ func gracefulShutdown(server *http.Server) {
 		log.Println("Shutting down...")
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		server.Shutdown(ctx)
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("Shutdown error: %v", err)
+		}
 	})
 }
