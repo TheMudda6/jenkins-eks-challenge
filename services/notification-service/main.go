@@ -65,7 +65,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Failed to close database: %v", err)
+		}
+	}()
 
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(3)
@@ -156,11 +160,13 @@ func migrate() {
 	}
 
 	for _, t := range templates {
-		db.Exec(
+		if _, err := db.Exec(
 			`INSERT INTO notification_templates (id, channel, subject, body)
 			 VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING`,
 			t.id, t.channel, t.subject, t.body,
-		)
+		); err != nil {
+			log.Printf("Failed to insert template %s: %v", t.id, err)
+		}
 	}
 
 	log.Println("Notification service migrations complete")
@@ -173,7 +179,9 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "notification-service"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "notification-service"}); err != nil {
+		log.Printf("Failed to encode health response: %v", err)
+	}
 }
 
 func handleSend(w http.ResponseWriter, r *http.Request) {
@@ -222,22 +230,27 @@ func handleSend(w http.ResponseWriter, r *http.Request) {
 	sentAt := time.Now()
 
 	var notifID int
-	db.QueryRow(
+	if err := db.QueryRow(
 		`INSERT INTO notifications (recipient, channel, template, subject, body, metadata, status, sent_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+	 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
 		req.Recipient, req.Channel, req.Template, subject, body, metadata, status, sentAt,
-	).Scan(&notifID)
+	).Scan(&notifID); err != nil {
+		httpError(w, "failed to create notification", http.StatusInternalServerError)
+		return
+	}
 
 	log.Printf("Notification sent: [%s] %s -> %s (template: %s)", req.Channel, req.Template, req.Recipient, req.Template)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"id":        notifID,
 		"recipient": req.Recipient,
 		"channel":   req.Channel,
 		"status":    status,
-	})
+	}); err != nil {
+		log.Printf("Failed to encode notification response: %v", err)
+	}
 }
 
 func handleHistory(w http.ResponseWriter, r *http.Request) {
@@ -257,7 +270,11 @@ func handleHistory(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "query failed", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Failed to close notification history rows: %v", err)
+		}
+	}()
 
 	type Notif struct {
 		ID        int    `json:"id"`
@@ -274,7 +291,10 @@ func handleHistory(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var n Notif
 		var sentAt sql.NullString
-		rows.Scan(&n.ID, &n.Recipient, &n.Channel, &n.Template, &n.Subject, &n.Status, &sentAt, &n.CreatedAt)
+		if err := rows.Scan(&n.ID, &n.Recipient, &n.Channel, &n.Template, &n.Subject, &n.Status, &sentAt, &n.CreatedAt); err != nil {
+			httpError(w, "failed to read notification history", http.StatusInternalServerError)
+			return
+		}
 		if sentAt.Valid {
 			n.SentAt = sentAt.String
 		}
@@ -282,7 +302,9 @@ func handleHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(notifs)
+	if err := json.NewEncoder(w).Encode(notifs); err != nil {
+		log.Printf("Failed to encode notification history: %v", err)
+	}
 }
 
 func handleTemplates(w http.ResponseWriter, r *http.Request) {
@@ -291,7 +313,11 @@ func handleTemplates(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "query failed", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Failed to close notification template rows: %v", err)
+		}
+	}()
 
 	type Template struct {
 		ID      string `json:"id"`
@@ -303,18 +329,25 @@ func handleTemplates(w http.ResponseWriter, r *http.Request) {
 	templates := []Template{}
 	for rows.Next() {
 		var t Template
-		rows.Scan(&t.ID, &t.Channel, &t.Subject, &t.Body)
+		if err := rows.Scan(&t.ID, &t.Channel, &t.Subject, &t.Body); err != nil {
+			httpError(w, "failed to read notification template", http.StatusInternalServerError)
+			return
+		}
 		templates = append(templates, t)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(templates)
+	if err := json.NewEncoder(w).Encode(templates); err != nil {
+		log.Printf("Failed to encode notification templates: %v", err)
+	}
 }
 
 func httpError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		log.Printf("Failed to encode error response: %v", err)
+	}
 }
 
 func getEnv(key, fallback string) string {
