@@ -89,7 +89,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Failed to close database: %v", err)
+		}
+	}()
 
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
@@ -177,7 +181,9 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "inventory-service"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": status, "service": "inventory-service"}); err != nil {
+		log.Printf("Failed to encode health response: %v", err)
+	}
 }
 
 func handleProducts(w http.ResponseWriter, r *http.Request) {
@@ -190,18 +196,28 @@ func handleProducts(w http.ResponseWriter, r *http.Request) {
 			httpError(w, "query failed", http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				log.Printf("Failed to close product rows: %v", err)
+			}
+		}()
 
 		products := []Product{}
 		for rows.Next() {
 			var p Product
-			rows.Scan(&p.ID, &p.Name, &p.SKU, &p.Price, &p.Stock, &p.Reserved, &p.CreatedAt, &p.UpdatedAt)
+			if err := rows.Scan(&p.ID, &p.Name, &p.SKU, &p.Price, &p.Stock, &p.Reserved, &p.CreatedAt, &p.UpdatedAt); err != nil {
+				httpError(w, "scan failed", http.StatusInternalServerError)
+				return
+			}
+
 			p.Available = p.Stock - p.Reserved
 			products = append(products, p)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(products)
+		if err := json.NewEncoder(w).Encode(products); err != nil {
+			log.Printf("Failed to encode products: %v", err)
+		}
 
 	case http.MethodPost:
 		var p struct {
@@ -227,7 +243,9 @@ func handleProducts(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"id": p.ID, "status": "created"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"id": p.ID, "status": "created"}); err != nil {
+			log.Printf("Failed to encode product response: %v", err)
+		}
 
 	default:
 		httpError(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -253,7 +271,9 @@ func handleProduct(w http.ResponseWriter, r *http.Request) {
 	p.Available = p.Stock - p.Reserved
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(p)
+	if err := json.NewEncoder(w).Encode(p); err != nil {
+		log.Printf("Failed to encode product: %v", err)
+	}
 }
 
 func handleReserve(w http.ResponseWriter, r *http.Request) {
@@ -279,7 +299,11 @@ func handleReserve(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "transaction failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Printf("Failed to rollback transaction: %v", err)
+		}
+	}()
 
 	expiresAt := time.Now().Add(15 * time.Minute)
 
@@ -325,11 +349,13 @@ func handleReserve(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"order_id":   req.OrderID,
 		"status":     "reserved",
 		"expires_at": expiresAt.Format(time.RFC3339),
-	})
+	}); err != nil {
+		log.Printf("Failed to encode reservation response: %v", err)
+	}
 }
 
 func handleRelease(w http.ResponseWriter, r *http.Request) {
@@ -351,7 +377,11 @@ func handleRelease(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "transaction failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Printf("Failed to rollback transaction: %v", err)
+		}
+	}()
 
 	rows, err := tx.Query(
 		"SELECT product_id, quantity FROM reservations WHERE order_id = $1 AND status = 'active'",
@@ -370,13 +400,17 @@ func handleRelease(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var it item
 		if err := rows.Scan(&it.productID, &it.quantity); err != nil {
-			rows.Close()
+			if err := rows.Close(); err != nil {
+				log.Printf("Failed to close reservation rows: %v", err)
+			}
 			httpError(w, "scan failed", http.StatusInternalServerError)
 			return
 		}
 		items = append(items, it)
 	}
-	rows.Close()
+	if err := rows.Close(); err != nil {
+		log.Printf("Failed to close reservation rows: %v", err)
+	}
 	if err := rows.Err(); err != nil {
 		httpError(w, "iteration failed", http.StatusInternalServerError)
 		return
@@ -400,10 +434,12 @@ func handleRelease(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"order_id": req.OrderID,
 		"released": len(items),
-	})
+	}); err != nil {
+		log.Printf("Failed to encode release response: %v", err)
+	}
 }
 
 func handleLowStock(w http.ResponseWriter, r *http.Request) {
@@ -416,7 +452,11 @@ func handleLowStock(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "query failed", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Failed to close low stock rows: %v", err)
+		}
+	}()
 
 	type LowStockItem struct {
 		ID        string `json:"id"`
@@ -430,19 +470,26 @@ func handleLowStock(w http.ResponseWriter, r *http.Request) {
 	items := []LowStockItem{}
 	for rows.Next() {
 		var i LowStockItem
-		rows.Scan(&i.ID, &i.Name, &i.SKU, &i.Stock, &i.Reserved)
+		if err := rows.Scan(&i.ID, &i.Name, &i.SKU, &i.Stock, &i.Reserved); err != nil {
+			httpError(w, "scan failed", http.StatusInternalServerError)
+			return
+		}
 		i.Available = i.Stock - i.Reserved
 		items = append(items, i)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(items)
+	if err := json.NewEncoder(w).Encode(items); err != nil {
+		log.Printf("Failed to encode low stock items: %v", err)
+	}
 }
 
 func httpError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		log.Printf("Failed to encode error response: %v", err)
+	}
 }
 
 func getEnv(key, fallback string) string {
