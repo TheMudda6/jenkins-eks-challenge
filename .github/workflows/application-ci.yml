@@ -122,7 +122,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Scan source with Trivy
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: services/${{ matrix.service }}
@@ -170,7 +170,7 @@ jobs:
             "services/${{ matrix.service }}"
 
       - name: Scan container image
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: "jenkins-eks-challenge-dev-${{ matrix.service }}:${{ github.sha }}"
           format: table
