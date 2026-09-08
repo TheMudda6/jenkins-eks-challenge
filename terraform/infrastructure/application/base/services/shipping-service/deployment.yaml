@@ -16,7 +16,7 @@ spec:
       serviceAccountName: shipping-service
       containers:
         - name: shipping-service
-          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-shipping-service:7f1b9d900acae1eff85030ec30c88d902d2ef7be
+          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-shipping-service:bab4debcd17cd104ce8c988c135050154e2dafb0
           imagePullPolicy: Always
           ports:
             - name: http
