@@ -246,6 +246,36 @@ aws logs describe-log-groups \
   --query 'logGroups[].logGroupName' \
   --output text
 
+echo
+echo "Remaining project SQS queues:"
+aws sqs list-queues \
+  --region "$AWS_REGION" \
+  --queue-name-prefix "jenkins-eks-challenge-dev-" \
+  --query 'QueueUrls[]' \
+  --output text
+
+echo
+echo "Remaining project ECR repositories:"
+aws ecr describe-repositories \
+  --region "$AWS_REGION" \
+  --query 'repositories[?starts_with(repositoryName, `jenkins-eks-challenge-dev-`)].repositoryName' \
+  --output text
+
+echo
+echo "Remaining NAT gateways:"
+aws ec2 describe-nat-gateways \
+  --region "$AWS_REGION" \
+  --filter "Name=state,Values=pending,available,deleting" \
+  --query 'NatGateways[].{Id:NatGatewayId,State:State,VpcId:VpcId}' \
+  --output table
+
+echo
+echo "Remaining Elastic IPs:"
+aws ec2 describe-addresses \
+  --region "$AWS_REGION" \
+  --query 'Addresses[].{AllocationId:AllocationId,PublicIp:PublicIp,AssociationId:AssociationId}' \
+  --output table
+
 # ------------------------------------------------------------
 # Final status
 # ------------------------------------------------------------
