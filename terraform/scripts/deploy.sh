@@ -345,8 +345,8 @@ kubectl get prometheusrules -n monitoring
 echo
 echo "Waiting for Prometheus..."
 kubectl wait \
-  --for=condition=Available \
-  statefulset/prometheus-monitoring-stack-kube-prom-prometheus \
+  --for=condition=Ready \
+  pod/prometheus-monitoring-stack-kube-prom-prometheus-0 \
   -n monitoring \
   --timeout=300s
 
