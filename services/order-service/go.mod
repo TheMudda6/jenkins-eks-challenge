@@ -1,6 +1,6 @@
 module github.com/CoderCo-Learning/ecs-v3/services/order-service
 
-go 1.24
+go 1.27.1
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.45.1
