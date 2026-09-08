@@ -16,7 +16,7 @@ spec:
       serviceAccountName: dashboard-api
       containers:
         - name: dashboard-api
-          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-dashboard-api:b1696ed6e73a33b6099f14c8f9183a0d53833ddf
+          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-dashboard-api:2de89a80ed164b29902117cf31b73369df4c847d
           imagePullPolicy: Always
           ports:
             - name: http
