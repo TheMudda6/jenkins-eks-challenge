@@ -245,7 +245,7 @@ echo "Waiting for Redis..."
 
 kubectl wait \
   --for=condition=Available \
-  deployment/redis \
+  statefulset/redis \
   -n jenkins \
   --timeout=300s
 
