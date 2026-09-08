@@ -346,7 +346,7 @@ echo
 echo "Waiting for Prometheus..."
 kubectl wait \
   --for=condition=Available \
-  deployment/prometheus-stack-kube-prom-prometheus \
+  statefulset/prometheus-monitoring-stack-kube-prom-prometheus \
   -n monitoring \
   --timeout=300s
 
@@ -356,7 +356,7 @@ echo
 echo "Waiting for Grafana..."
 kubectl wait \
   --for=condition=Available \
-  deployment/prometheus-stack-grafana \
+  deployment/monitoring-stack-grafana \
   -n monitoring \
   --timeout=300s
 
