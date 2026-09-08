@@ -225,6 +225,34 @@ do
 done
 
 # ------------------------------------------------------------
+# Configure application runtime
+# ------------------------------------------------------------
+
+print_banner "Configuring Application Runtime"
+
+echo "Waiting for jenkins namespace..."
+
+until kubectl get namespace jenkins >/dev/null 2>&1; do
+  sleep 5
+done
+
+SQS_QUEUE_URL="$(terraform output -raw queue_url)"
+
+if [ -z "$SQS_QUEUE_URL" ]; then
+  echo "ERROR: Terraform queue_url output is empty."
+  exit 1
+fi
+
+kubectl create configmap application-config \
+  -n jenkins \
+  --from-literal="SQS_QUEUE_URL=$SQS_QUEUE_URL" \
+  --dry-run=client \
+  -o yaml \
+  | kubectl apply -f -
+
+echo "✓ application-config is ready."
+
+# ------------------------------------------------------------
 # Verify application workloads
 # ------------------------------------------------------------
 
