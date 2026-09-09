@@ -190,11 +190,29 @@ fi
 
 print_banner "Terraform Destroy"
 
-terraform apply -auto-approve destroy.tfplan
+if terraform apply -auto-approve destroy.tfplan; then
+  rm -f destroy.tfplan
+  echo "✓ Terraform infrastructure destroyed."
+else
+  echo
+  echo "WARNING: Terraform destroy encountered an error."
+  echo "Waiting 30 seconds before retrying with a fresh destroy plan..."
+  echo
 
-rm -f destroy.tfplan
+  rm -f destroy.tfplan
 
-echo "✓ Terraform infrastructure destroyed."
+  sleep 30
+
+  print_banner "Terraform Destroy Retry"
+
+  terraform plan -destroy -out=destroy-retry.tfplan
+
+  terraform apply -auto-approve destroy-retry.tfplan
+
+  rm -f destroy-retry.tfplan
+
+  echo "✓ Terraform infrastructure destroyed."
+fi
 
 # ------------------------------------------------------------
 # Terraform state verification
