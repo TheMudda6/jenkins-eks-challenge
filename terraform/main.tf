@@ -81,6 +81,8 @@ module "iam" {
   route53_zone_id          = var.route53_zone_id
   cert_manager_role_name   = var.cert_manager_role_name
   cert_manager_policy_name = var.cert_manager_policy_name
+  external_dns_role_name   = var.external_dns_role_name
+  external_dns_policy_name = var.external_dns_policy_name
 
   oidc_provider_arn = module.eks.oidc_provider_arn
 

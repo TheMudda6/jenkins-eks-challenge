@@ -47,3 +47,12 @@ output "cert_manager_role_arn" {
   value       = aws_iam_role.cert_manager.arn
   description = "ARN of the cert-manager IAM Role."
 }
+
+# -----------------------------------------------------------------------------
+# ExternalDNS
+# -----------------------------------------------------------------------------
+
+output "external_dns_role_arn" {
+  value       = aws_iam_role.external_dns.arn
+  description = "ARN of the ExternalDNS IAM Role."
+}

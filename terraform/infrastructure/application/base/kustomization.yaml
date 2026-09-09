@@ -15,3 +15,4 @@ resources:
   - services/dashboard-api
   - services/scheduler
   - services/worker
+  - ingress.yaml
