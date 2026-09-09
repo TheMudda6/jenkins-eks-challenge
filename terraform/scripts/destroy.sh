@@ -169,6 +169,27 @@ fi
 # Terraform destroy plan
 # ------------------------------------------------------------
 
+print_banner "Preserving ECR Repositories"
+
+for service in \
+  api-gateway \
+  order-service \
+  inventory-service \
+  payment-service \
+  notification-service \
+  shipping-service \
+  dashboard-api \
+  scheduler \
+  worker
+do
+  terraform state rm \
+    "module.ecr.aws_ecr_repository.services[\"$service\"]" \
+    2>/dev/null || true
+done
+
+echo "✓ ECR repositories released from Terraform state."
+echo "✓ ECR repositories and images will be preserved."
+
 print_banner "Terraform Destroy Plan"
 
 terraform plan -destroy -out=destroy.tfplan
@@ -273,7 +294,7 @@ aws sqs list-queues \
   --output text
 
 echo
-echo "Remaining project ECR repositories:"
+echo "Preserved project ECR repositories:"
 aws ecr describe-repositories \
   --region "$AWS_REGION" \
   --query 'repositories[?starts_with(repositoryName, `jenkins-eks-challenge-dev-`)].repositoryName' \

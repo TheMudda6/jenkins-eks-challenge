@@ -65,6 +65,34 @@ terraform validate
 
 echo "✓ Terraform configuration validated."
 
+print_banner "Reusing ECR Repositories"
+
+for service in \
+  api-gateway \
+  order-service \
+  inventory-service \
+  payment-service \
+  notification-service \
+  shipping-service \
+  dashboard-api \
+  scheduler \
+  worker
+do
+  repository="jenkins-eks-challenge-dev-${service}"
+  address="module.ecr.aws_ecr_repository.services[\"${service}\"]"
+
+  if aws ecr describe-repositories \
+    --region "$AWS_REGION" \
+    --repository-names "$repository" >/dev/null 2>&1; then
+
+    if ! terraform state show "$address" >/dev/null 2>&1; then
+      terraform import "$address" "$repository"
+    fi
+  fi
+done
+
+echo "✓ ECR repositories are ready for Terraform."
+
 # ------------------------------------------------------------
 # Terraform plan
 # ------------------------------------------------------------
