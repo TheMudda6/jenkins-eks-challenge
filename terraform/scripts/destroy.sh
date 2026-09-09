@@ -159,52 +159,83 @@ echo "✓ ArgoCD Applications released."
 
 print_banner "Cleaning Up Traefik Load Balancer"
 
+TRAEFIK_NLB_ARN="$(
+  aws elbv2 describe-load-balancers \
+    --region "$AWS_REGION" \
+    --query 'LoadBalancers[?contains(LoadBalancerName, `traefik`)].LoadBalancerArn' \
+    --output text
+)"
+
+if [[ -n "$TRAEFIK_NLB_ARN" ]]; then
+  echo "Found Traefik Load Balancer:"
+  echo "$TRAEFIK_NLB_ARN"
+fi
+
 if kubectl get namespace traefik >/dev/null 2>&1; then
   echo "Deleting Traefik Helm release..."
 
-  helm uninstall traefik \
+  if helm uninstall traefik \
     --namespace traefik \
     --wait \
-    --timeout 5m
-
-  echo "✓ Traefik Helm release removed."
+    --timeout 5m; then
+    echo "✓ Traefik Helm release removed."
+  else
+    echo "WARNING: Traefik Helm uninstall did not complete cleanly."
+  fi
 
   terraform state rm 'helm_release.traefik' 2>/dev/null || true
   echo "✓ Traefik released from Terraform state."
 fi
 
-echo "Waiting for Traefik Load Balancer to disappear..."
+if [[ -n "$TRAEFIK_NLB_ARN" ]]; then
+  echo "Waiting for Traefik Load Balancer to disappear..."
 
-for attempt in {1..60}; do
-  if ! aws elbv2 describe-load-balancers \
-    --region "$AWS_REGION" \
-    --query 'LoadBalancers[?contains(LoadBalancerName, `traefik`)].LoadBalancerArn' \
-    --output text 2>/dev/null | grep -q .; then
-    echo "✓ Traefik Load Balancer is gone."
-    break
+  for attempt in {1..60}; do
+    if ! aws elbv2 describe-load-balancers \
+      --region "$AWS_REGION" \
+      --load-balancer-arns "$TRAEFIK_NLB_ARN" \
+      >/dev/null 2>&1; then
+      echo "✓ Traefik Load Balancer is gone."
+      TRAEFIK_NLB_ARN=""
+      break
+    fi
+
+    sleep 5
+  done
+
+  if [[ -n "$TRAEFIK_NLB_ARN" ]]; then
+    echo "WARNING: Traefik Load Balancer still exists."
+    echo "Deleting the remaining Traefik Load Balancer directly..."
+
+    aws elbv2 delete-load-balancer \
+      --region "$AWS_REGION" \
+      --load-balancer-arn "$TRAEFIK_NLB_ARN"
+
+    echo "✓ Traefik Load Balancer deletion requested."
+
+    echo "Waiting for Traefik Load Balancer deletion..."
+
+    for attempt in {1..60}; do
+      if ! aws elbv2 describe-load-balancers \
+        --region "$AWS_REGION" \
+        --load-balancer-arns "$TRAEFIK_NLB_ARN" \
+        >/dev/null 2>&1; then
+        echo "✓ Traefik Load Balancer is fully deleted."
+        TRAEFIK_NLB_ARN=""
+        break
+      fi
+
+      sleep 5
+    done
+
+    if [[ -n "$TRAEFIK_NLB_ARN" ]]; then
+      echo "ERROR: Traefik Load Balancer still exists after deletion request."
+      exit 1
+    fi
   fi
-
-  if [[ "$attempt" -eq 60 ]]; then
-    echo "ERROR: Traefik Load Balancer still exists after 5 minutes."
-    exit 1
-  fi
-
-  sleep 5
-done
-
-echo "Waiting for Traefik Load Balancer to disappear..."
-
-for attempt in {1..60}; do
-  if ! aws elbv2 describe-load-balancers \
-    --region "$AWS_REGION" \
-    --query 'LoadBalancers[?contains(LoadBalancerName, `traefik`)].LoadBalancerArn' \
-    --output text 2>/dev/null | grep -q .; then
-    echo "✓ Traefik Load Balancer is gone."
-    break
-  fi
-
-  sleep 5
-done
+else
+  echo "✓ No Traefik Load Balancer found."
+fi
 
   else
 
