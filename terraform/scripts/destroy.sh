@@ -35,6 +35,11 @@ command -v kubectl >/dev/null || {
   exit 1
 }
 
+command -v helm >/dev/null || {
+  echo "ERROR: Helm is not installed."
+  exit 1
+}
+
 echo "✓ Required tools found."
 
 # ------------------------------------------------------------
@@ -95,6 +100,32 @@ if [[ -n "$EKS_STATUS" && "$EKS_STATUS" != "None" && "$EKS_STATUS" != "DELETING"
   echo "EKS cluster status: $EKS_STATUS"
 else
   echo "EKS cluster is not available."
+fi
+
+PROJECT_VPC_ID="$(
+  aws ec2 describe-vpcs \
+    --region "$AWS_REGION" \
+    --filters "Name=tag:Name,Values=jenkins-vpc" \
+    --query 'Vpcs[0].VpcId' \
+    --output text
+)"
+
+if [[ "$PROJECT_VPC_ID" == "None" ]]; then
+  PROJECT_VPC_ID=""
+fi
+
+if [[ -n "$PROJECT_VPC_ID" ]]; then
+  echo "Jenkins VPC: $PROJECT_VPC_ID"
+else
+  echo "Jenkins VPC does not exist."
+fi
+
+PROJECT_EIP_ALLOCATIONS=""
+
+if [[ -n "$PROJECT_VPC_ID" ]]; then
+  PROJECT_EIP_ALLOCATIONS="$(
+    aws ec2 describe-nat-gateways --region "$AWS_REGION" --filter "Name=vpc-id,Values=$PROJECT_VPC_ID" --query 'NatGateways[].NatGatewayAddresses[].AllocationId' --output text
+  )"
 fi
 
 # ------------------------------------------------------------
@@ -159,12 +190,21 @@ echo "✓ ArgoCD Applications released."
 
 print_banner "Cleaning Up Traefik Load Balancer"
 
-TRAEFIK_NLB_ARN="$(
+TRAEFIK_NLB_ARN=""
+
+TRAEFIK_CANDIDATES="$(
   aws elbv2 describe-load-balancers \
     --region "$AWS_REGION" \
-    --query 'LoadBalancers[?contains(LoadBalancerName, `traefik`)].LoadBalancerArn' \
+    --query 'LoadBalancers[?contains(LoadBalancerName, `traefik`)].{Arn:LoadBalancerArn,VpcId:VpcId}' \
     --output text
 )"
+
+while read -r candidate_arn candidate_vpc; do
+  if [[ "$candidate_vpc" == "$PROJECT_VPC_ID" ]]; then
+    TRAEFIK_NLB_ARN="$candidate_arn"
+    break
+  fi
+done <<< "$TRAEFIK_CANDIDATES"
 
 if [[ -n "$TRAEFIK_NLB_ARN" ]]; then
   echo "Found Traefik Load Balancer:"
@@ -191,16 +231,23 @@ if [[ -n "$TRAEFIK_NLB_ARN" ]]; then
   echo "Waiting for Traefik Load Balancer to disappear..."
 
   for attempt in {1..60}; do
-    if ! aws elbv2 describe-load-balancers \
+    if TRAEFIK_LB_ERROR="$(aws elbv2 describe-load-balancers \
       --region "$AWS_REGION" \
       --load-balancer-arns "$TRAEFIK_NLB_ARN" \
-      >/dev/null 2>&1; then
+      2>&1)"; then
+      sleep 5
+      continue
+    fi
+
+    if grep -q "LoadBalancerNotFound" <<< "$TRAEFIK_LB_ERROR"; then
       echo "✓ Traefik Load Balancer is gone."
       TRAEFIK_NLB_ARN=""
       break
     fi
 
-    sleep 5
+    echo "$TRAEFIK_LB_ERROR"
+    echo "ERROR: Failed to check Traefik Load Balancer status."
+    exit 1
   done
 
   if [[ -n "$TRAEFIK_NLB_ARN" ]]; then
@@ -212,20 +259,26 @@ if [[ -n "$TRAEFIK_NLB_ARN" ]]; then
       --load-balancer-arn "$TRAEFIK_NLB_ARN"
 
     echo "✓ Traefik Load Balancer deletion requested."
-
     echo "Waiting for Traefik Load Balancer deletion..."
 
     for attempt in {1..60}; do
-      if ! aws elbv2 describe-load-balancers \
+      if TRAEFIK_LB_ERROR="$(aws elbv2 describe-load-balancers \
         --region "$AWS_REGION" \
         --load-balancer-arns "$TRAEFIK_NLB_ARN" \
-        >/dev/null 2>&1; then
+        2>&1)"; then
+        sleep 5
+        continue
+      fi
+
+      if grep -q "LoadBalancerNotFound" <<< "$TRAEFIK_LB_ERROR"; then
         echo "✓ Traefik Load Balancer is fully deleted."
         TRAEFIK_NLB_ARN=""
         break
       fi
 
-      sleep 5
+      echo "$TRAEFIK_LB_ERROR"
+      echo "ERROR: Failed to verify Traefik Load Balancer deletion."
+      exit 1
     done
 
     if [[ -n "$TRAEFIK_NLB_ARN" ]]; then
@@ -243,6 +296,64 @@ fi
     echo "Skipping Kubernetes cleanup."
 
   fi
+fi
+
+# ------------------------------------------------------------
+# Terraform destroy plan
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Kubernetes security group cleanup
+# ------------------------------------------------------------
+
+print_banner "Cleaning Up Kubernetes Security Groups"
+
+VPC_ID="$(
+  aws ec2 describe-vpcs \
+    --region "$AWS_REGION" \
+    --filters "Name=tag:Name,Values=jenkins-vpc" \
+    --query 'Vpcs[0].VpcId' \
+    --output text
+)"
+
+if [[ -n "$VPC_ID" && "$VPC_ID" != "None" ]]; then
+  for group_name in \
+    "k8s-traffic-jenkinseks-*" \
+    "k8s-traefik-traefik-*"
+  do
+    GROUP_IDS="$(
+      aws ec2 describe-security-groups \
+        --region "$AWS_REGION" \
+        --filters \
+          "Name=vpc-id,Values=$VPC_ID" \
+          "Name=group-name,Values=$group_name" \
+        --query 'SecurityGroups[].GroupId' \
+        --output text
+    )"
+
+    for group_id in $GROUP_IDS; do
+      echo "Cleaning up Kubernetes security group: $group_id"
+
+      for attempt in {1..12}; do
+        if aws ec2 delete-security-group \
+          --region "$AWS_REGION" \
+          --group-id "$group_id" \
+          >/dev/null 2>&1; then
+          echo "✓ Deleted security group: $group_id"
+          break
+        fi
+
+        if [[ "$attempt" -eq 12 ]]; then
+          echo "ERROR: Could not delete security group: $group_id"
+          exit 1
+        fi
+
+        sleep 5
+      done
+    done
+  done
+else
+  echo "✓ VPC no longer exists; no Kubernetes security groups to clean up."
 fi
 
 # ------------------------------------------------------------
@@ -339,39 +450,114 @@ echo "✓ Terraform state is empty."
 print_banner "AWS Cleanup Verification"
 
 echo "Remaining EKS clusters:"
-aws eks list-clusters \
-  --region "$AWS_REGION"
 
+REMAINING_CLUSTERS="$(
+  aws eks list-clusters \
+    --region "$AWS_REGION" \
+    --query 'clusters[]' \
+    --output text
+)"
+
+if [[ -n "$REMAINING_CLUSTERS" ]]; then
+  echo "$REMAINING_CLUSTERS"
+  echo "ERROR: EKS clusters still exist."
+  exit 1
+fi
+
+echo "✓ No EKS clusters remain."
 echo
 echo "Remaining Jenkins VPCs:"
-aws ec2 describe-vpcs \
-  --region "$AWS_REGION" \
-  --filters "Name=tag:Name,Values=jenkins-vpc" \
-  --query 'Vpcs[].VpcId' \
-  --output text
 
+REMAINING_VPCS="$(
+  aws ec2 describe-vpcs \
+    --region "$AWS_REGION" \
+    --filters "Name=tag:Name,Values=jenkins-vpc" \
+    --query 'Vpcs[].VpcId' \
+    --output text
+)"
+
+if [[ -n "$REMAINING_VPCS" ]]; then
+  echo "$REMAINING_VPCS"
+  echo "ERROR: Jenkins VPCs still exist."
+  exit 1
+fi
+
+echo "✓ No Jenkins VPCs remain."
 echo
 echo "Remaining Load Balancers:"
-aws elbv2 describe-load-balancers \
-  --region "$AWS_REGION" \
-  --query 'LoadBalancers[].LoadBalancerArn' \
-  --output text
+
+REMAINING_LOAD_BALANCERS="$(
+  aws elbv2 describe-load-balancers \
+    --region "$AWS_REGION" \
+    --query 'LoadBalancers[].LoadBalancerArn' \
+    --output text
+)"
+
+if [[ -n "$REMAINING_LOAD_BALANCERS" ]]; then
+  echo "$REMAINING_LOAD_BALANCERS"
+  echo "ERROR: Load Balancers still exist."
+  exit 1
+fi
+
+echo "✓ No Load Balancers remain."
 
 echo
 echo "Remaining EKS CloudWatch log groups:"
-aws logs describe-log-groups \
-  --region "$AWS_REGION" \
-  --log-group-name-prefix "/aws/eks/$CLUSTER_NAME" \
-  --query 'logGroups[].logGroupName' \
-  --output text
+
+REMAINING_LOG_GROUPS="$(
+  aws logs describe-log-groups \
+    --region "$AWS_REGION" \
+    --log-group-name-prefix "/aws/eks/$CLUSTER_NAME" \
+    --query 'logGroups[].logGroupName' \
+    --output text
+)"
+
+if [[ -n "$REMAINING_LOG_GROUPS" ]]; then
+  echo "$REMAINING_LOG_GROUPS"
+  echo "ERROR: EKS CloudWatch log groups still exist."
+  exit 1
+fi
+
+echo "✓ No EKS CloudWatch log groups remain."
 
 echo
 echo "Remaining project SQS queues:"
-aws sqs list-queues \
-  --region "$AWS_REGION" \
-  --queue-name-prefix "jenkins-eks-challenge-dev-" \
-  --query 'QueueUrls[]' \
-  --output text
+
+REMAINING_QUEUES="$(
+  aws sqs list-queues \
+    --region "$AWS_REGION" \
+    --queue-name-prefix "jenkins-eks-challenge-dev-" \
+    --query 'QueueUrls[]' \
+    --output text
+)"
+
+if [[ -n "$REMAINING_QUEUES" ]]; then
+  echo "$REMAINING_QUEUES"
+  echo "ERROR: Project SQS queues still exist."
+  exit 1
+fi
+
+echo "✓ No project SQS queues remain."
+
+echo "Remaining Kubernetes security groups:"
+
+REMAINING_K8S_SGS="$(
+  aws ec2 describe-security-groups \
+    --region "$AWS_REGION" \
+    --filters \
+      "Name=vpc-id,Values=$PROJECT_VPC_ID" \
+      "Name=group-name,Values=k8s-traffic-jenkinseks-*,k8s-traefik-traefik-*" \
+    --query 'SecurityGroups[].GroupId' \
+    --output text
+)"
+
+if [[ -n "$REMAINING_K8S_SGS" ]]; then
+  echo "$REMAINING_K8S_SGS"
+  echo "ERROR: Kubernetes security groups still exist."
+  exit 1
+fi
+
+echo "✓ No targeted Kubernetes security groups remain."
 
 echo
 echo "Preserved project ECR repositories:"
@@ -382,18 +568,48 @@ aws ecr describe-repositories \
 
 echo
 echo "Remaining NAT gateways:"
-aws ec2 describe-nat-gateways \
-  --region "$AWS_REGION" \
-  --filter "Name=state,Values=pending,available,deleting" \
-  --query 'NatGateways[].{Id:NatGatewayId,State:State,VpcId:VpcId}' \
-  --output table
+
+REMAINING_NAT_GATEWAYS="$(
+  aws ec2 describe-nat-gateways \
+    --region "$AWS_REGION" \
+    --filter "Name=state,Values=pending,available,deleting" \
+    --query 'NatGateways[].NatGatewayId' \
+    --output text
+)"
+
+if [[ -n "$REMAINING_NAT_GATEWAYS" ]]; then
+  echo "$REMAINING_NAT_GATEWAYS"
+  echo "ERROR: NAT gateways still exist."
+  exit 1
+fi
+
+echo "✓ No NAT gateways remain."
+
+echo
 
 echo
 echo "Remaining Elastic IPs:"
-aws ec2 describe-addresses \
-  --region "$AWS_REGION" \
-  --query 'Addresses[].{AllocationId:AllocationId,PublicIp:PublicIp,AssociationId:AssociationId}' \
-  --output table
+
+REMAINING_EIPS=false
+
+if [[ -n "$PROJECT_EIP_ALLOCATIONS" ]]; then
+  for allocation_id in $PROJECT_EIP_ALLOCATIONS; do
+    if aws ec2 describe-addresses \
+      --region "$AWS_REGION" \
+      --allocation-ids "$allocation_id" \
+      >/dev/null 2>&1; then
+      echo "$allocation_id"
+      REMAINING_EIPS=true
+    fi
+  done
+fi
+
+if [[ "$REMAINING_EIPS" == true ]]; then
+  echo "ERROR: Project Elastic IPs still exist."
+  exit 1
+fi
+
+echo "✓ No project Elastic IPs remain."
 
 # ------------------------------------------------------------
 # Final status
