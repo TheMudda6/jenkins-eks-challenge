@@ -446,12 +446,12 @@ echo "✓ Prometheus is ready."
 
  echo
  echo "Waiting for Grafana..."
-+kubectl wait \
-+  --for=create \
-+  deployment/monitoring-stack-grafana \
-+  -n monitoring \
-+  --timeout=300s
-+
+kubectl wait \
+  --for=create \
+  deployment/monitoring-stack-grafana \
+  -n monitoring \
+  --timeout=300s
+
  kubectl wait \
    --for=condition=Available \
    deployment/monitoring-stack-grafana \
