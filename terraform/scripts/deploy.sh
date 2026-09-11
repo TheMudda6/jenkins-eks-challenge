@@ -430,25 +430,35 @@ print_banner "Verifying Monitoring"
 kubectl get servicemonitors -n monitoring
 kubectl get prometheusrules -n monitoring
 
-echo
-echo "Waiting for Prometheus..."
 kubectl wait \
-  --for=condition=Ready \
-  pod/prometheus-monitoring-stack-kube-prom-prometheus-0 \
+  --for=create \
+  statefulset/prometheus-monitoring-stack-kube-prom-prometheus \
+  -n monitoring \
+  --timeout=300s
+
+kubectl wait \
+  --for=jsonpath='{.status.readyReplicas}'=1 \
+  statefulset/prometheus-monitoring-stack-kube-prom-prometheus \
   -n monitoring \
   --timeout=300s
 
 echo "✓ Prometheus is ready."
 
-echo
-echo "Waiting for Grafana..."
-kubectl wait \
-  --for=condition=Available \
-  deployment/monitoring-stack-grafana \
-  -n monitoring \
-  --timeout=300s
+ echo
+ echo "Waiting for Grafana..."
++kubectl wait \
++  --for=create \
++  deployment/monitoring-stack-grafana \
++  -n monitoring \
++  --timeout=300s
++
+ kubectl wait \
+   --for=condition=Available \
+   deployment/monitoring-stack-grafana \
+   -n monitoring \
+   --timeout=300s
 
-echo "✓ Grafana is ready."
+ echo "✓ Grafana is ready."
 
 echo
 echo "Monitoring pods:"
