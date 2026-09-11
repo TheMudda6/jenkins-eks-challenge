@@ -48,6 +48,9 @@ resource "helm_release" "aws_load_balancer_controller" {
     module.eks,
     module.iam,
   ]
+
+  wait = true
+
 }
 
 resource "helm_release" "external_secrets" {
