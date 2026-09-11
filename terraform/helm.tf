@@ -60,6 +60,8 @@ resource "helm_release" "external_secrets" {
   namespace        = "external-secrets"
   create_namespace = true
 
+  timeout = 720
+
   depends_on = [
     module.eks
   ]
