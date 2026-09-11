@@ -196,6 +196,21 @@ output "github_actions_role_arn" {
   value       = module.iam.github_actions_role_arn
 }
 
+output "cluster_name" {
+  description = "EKS cluster name"
+  value       = module.eks.cluster_name
+}
+
+output "cluster_endpoint" {
+  description = "EKS Kubernetes API endpoint"
+  value       = module.eks.cluster_endpoint
+}
+
+output "cluster_certificate_authority_data" {
+  description = "Base64-encoded EKS cluster CA certificate"
+  value       = module.eks.cluster_certificate_authority_data
+}
+
 module "secrets" {
   source = "./modules/secrets"
 

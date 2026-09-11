@@ -383,7 +383,16 @@ echo "✓ ECR repositories and images will be preserved."
 
 print_banner "Terraform Destroy Plan"
 
-terraform plan -destroy -out=destroy.tfplan
+KUBERNETES_HOST="$(terraform output -raw cluster_endpoint)"
+KUBERNETES_CA_CERTIFICATE="$(terraform output -raw cluster_certificate_authority_data)"
+KUBERNETES_CLUSTER_NAME="$(terraform output -raw cluster_name)"
+
+terraform plan -destroy \
+  -var="terraform_bootstrap=false" \
+  -var="kubernetes_host=$KUBERNETES_HOST" \
+  -var="kubernetes_ca_certificate=$KUBERNETES_CA_CERTIFICATE" \
+  -var="kubernetes_cluster_name=$KUBERNETES_CLUSTER_NAME" \
+  -out=destroy.tfplan
 
 echo
 echo "Terraform destroy plan created."
@@ -417,7 +426,12 @@ else
 
   print_banner "Terraform Destroy Retry"
 
-  terraform plan -destroy -out=destroy-retry.tfplan
+  terraform plan -destroy \
+  -var="terraform_bootstrap=false" \
+  -var="kubernetes_host=$KUBERNETES_HOST" \
+  -var="kubernetes_ca_certificate=$KUBERNETES_CA_CERTIFICATE" \
+  -var="kubernetes_cluster_name=$KUBERNETES_CLUSTER_NAME" \
+  -out=destroy-retry.tfplan
 
   terraform apply -auto-approve destroy-retry.tfplan
 
@@ -531,6 +545,10 @@ REMAINING_QUEUES="$(
     --output text
 )"
 
+if [[ "$REMAINING_QUEUES" == "None" ]]; then
+  REMAINING_QUEUES=""
+fi
+
 if [[ -n "$REMAINING_QUEUES" ]]; then
   echo "$REMAINING_QUEUES"
   echo "ERROR: Project SQS queues still exist."
@@ -541,20 +559,22 @@ echo "✓ No project SQS queues remain."
 
 echo "Remaining Kubernetes security groups:"
 
-REMAINING_K8S_SGS="$(
-  aws ec2 describe-security-groups \
-    --region "$AWS_REGION" \
-    --filters \
-      "Name=vpc-id,Values=$PROJECT_VPC_ID" \
-      "Name=group-name,Values=k8s-traffic-jenkinseks-*,k8s-traefik-traefik-*" \
-    --query 'SecurityGroups[].GroupId' \
-    --output text
-)"
+if [[ -n "$PROJECT_VPC_ID" ]]; then
+  REMAINING_K8S_SGS="$(
+    aws ec2 describe-security-groups \
+      --region "$AWS_REGION" \
+      --filters \
+        "Name=vpc-id,Values=$PROJECT_VPC_ID" \
+        "Name=group-name,Values=k8s-traffic-jenkinseks-*,k8s-traefik-traefik-*" \
+      --query 'SecurityGroups[].GroupId' \
+      --output text
+  )"
 
-if [[ -n "$REMAINING_K8S_SGS" ]]; then
-  echo "$REMAINING_K8S_SGS"
-  echo "ERROR: Kubernetes security groups still exist."
-  exit 1
+  if [[ -n "$REMAINING_K8S_SGS" && "$REMAINING_K8S_SGS" != "None" ]]; then
+    echo "$REMAINING_K8S_SGS"
+    echo "ERROR: Kubernetes security groups still exist."
+    exit 1
+  fi
 fi
 
 echo "✓ No targeted Kubernetes security groups remain."

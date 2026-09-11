@@ -220,3 +220,31 @@ resource "helm_release" "traefik" {
     helm_release.aws_load_balancer_controller,
   ]
 }
+
+# -----------------------------------------------------------------------------
+# Metrics Server
+#
+# Purpose:
+# Provides resource metrics for Kubernetes HPAs and kubectl top.
+# -----------------------------------------------------------------------------
+
+resource "helm_release" "metrics_server" {
+  name       = "metrics-server"
+  repository = "https://kubernetes-sigs.github.io/metrics-server/"
+  chart      = "metrics-server"
+  namespace  = "kube-system"
+
+  set {
+    name  = "args[0]"
+    value = "--kubelet-preferred-address-types=InternalIP\\,Hostname"
+  }
+
+  set {
+    name  = "args[1]"
+    value = "--kubelet-use-node-status-port"
+  }
+
+  depends_on = [
+    module.eks,
+  ]
+}

@@ -35,8 +35,9 @@ terraform {
 
 provider "helm" {
   kubernetes {
-    host                   = module.eks.cluster_endpoint
-    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    host = var.terraform_bootstrap ? "https://127.0.0.1:65535" : var.kubernetes_host
+
+    cluster_ca_certificate = var.terraform_bootstrap ? null : base64decode(var.kubernetes_ca_certificate)
 
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
@@ -46,15 +47,15 @@ provider "helm" {
         "eks",
         "get-token",
         "--cluster-name",
-        module.eks.cluster_name
+        var.terraform_bootstrap ? "bootstrap-placeholder" : var.kubernetes_cluster_name
       ]
     }
   }
 }
 
 provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  host                   = var.terraform_bootstrap ? "https://127.0.0.1:65535" : var.kubernetes_host
+  cluster_ca_certificate = var.terraform_bootstrap ? null : base64decode(var.kubernetes_ca_certificate)
 
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
@@ -64,7 +65,7 @@ provider "kubernetes" {
       "eks",
       "get-token",
       "--cluster-name",
-      module.eks.cluster_name
+      var.terraform_bootstrap ? "bootstrap-placeholder" : var.kubernetes_cluster_name
     ]
   }
 }

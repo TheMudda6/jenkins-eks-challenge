@@ -97,34 +97,94 @@ echo "✓ ECR repositories are ready for Terraform."
 # Terraform plan
 # ------------------------------------------------------------
 
-print_banner "Terraform Plan"
+# ------------------------------------------------------------
+# Terraform bootstrap
+# ------------------------------------------------------------
 
-terraform plan -out=tfplan
+print_banner "Terraform Bootstrap Plan"
+
+terraform plan \
+  -var="terraform_bootstrap=true" \
+  -target=module.vpc \
+  -target=module.sqs \
+  -target=module.ecr \
+  -target=module.secrets \
+  -target=module.iam \
+  -target=module.eks \
+  -out=tfplan-bootstrap
 
 echo
-echo "Terraform plan created successfully."
+echo "Terraform bootstrap plan created successfully."
 echo
 echo "Review the plan above before continuing."
 echo
-read -r -p "Apply this Terraform plan? [y/N] " CONFIRM
+read -r -p "Apply this Terraform bootstrap plan? [y/N] " CONFIRM
 
 if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-  echo "Terraform apply cancelled."
-  rm -f tfplan
+  echo "Terraform bootstrap apply cancelled."
+  rm -f tfplan-bootstrap
   exit 0
 fi
 
+print_banner "Terraform Bootstrap Apply"
+
+terraform apply tfplan-bootstrap
+
+rm -f tfplan-bootstrap
+
+echo "✓ Terraform bootstrap apply complete."
+
 # ------------------------------------------------------------
-# Terraform apply
+# Configure Kubernetes access
 # ------------------------------------------------------------
 
-print_banner "Terraform Apply"
+print_banner "Configuring Kubernetes"
 
-terraform apply tfplan
+aws eks update-kubeconfig \
+  --region "$AWS_REGION" \
+  --name "$CLUSTER_NAME"
 
-rm -f tfplan
+kubectl get nodes
 
-echo "✓ Terraform apply complete."
+echo "✓ Kubernetes connectivity verified."
+
+# ------------------------------------------------------------
+# Terraform Platform Plan
+# ------------------------------------------------------------
+
+ print_banner "Terraform Platform Plan"
+
+KUBERNETES_HOST="$(terraform output -raw cluster_endpoint)"
+KUBERNETES_CA_CERTIFICATE="$(terraform output -raw cluster_certificate_authority_data)"
+KUBERNETES_CLUSTER_NAME="$(terraform output -raw cluster_name)"
+
+ terraform plan \
+   -var="terraform_bootstrap=false" \
+   -var="kubernetes_host=$KUBERNETES_HOST" \
+   -var="kubernetes_ca_certificate=$KUBERNETES_CA_CERTIFICATE" \
+   -var="kubernetes_cluster_name=$KUBERNETES_CLUSTER_NAME" \
+   -out=tfplan-platform
+
+echo
+echo "Terraform platform plan created successfully."
+echo
+echo "Review the plan above before continuing."
+echo
+read -r -p "Apply this Terraform platform plan? [y/N] " CONFIRM
+
+if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+  echo "Terraform platform apply cancelled."
+  rm -f tfplan-platform
+  exit 0
+fi
+
+print_banner "Terraform Platform Apply"
+
+terraform apply tfplan-platform
+
+rm -f tfplan-platform
+
+echo "✓ Terraform platform apply complete."
 
 # ------------------------------------------------------------
 # Kubernetes configuration

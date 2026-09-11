@@ -154,9 +154,9 @@ resource "aws_route_table" "private" {
 
 resource "aws_route_table_association" "public" {
 
-  for_each = aws_subnet.public
+  for_each = toset(var.public_subnets)
 
-  subnet_id      = each.value.id
+  subnet_id      = aws_subnet.public[each.value].id
   route_table_id = aws_route_table.public.id
 }
 
@@ -169,9 +169,9 @@ resource "aws_route_table_association" "public" {
 
 resource "aws_route_table_association" "private" {
 
-  for_each = aws_subnet.private
+  for_each = toset(var.private_subnets)
 
-  subnet_id      = each.value.id
+  subnet_id      = aws_subnet.private[each.value].id
   route_table_id = aws_route_table.private.id
 }
 

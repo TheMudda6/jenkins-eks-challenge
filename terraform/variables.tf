@@ -361,3 +361,27 @@ variable "external_dns_policy_name" {
   description = "IAM Policy name for ExternalDNS."
   type        = string
 }
+
+variable "terraform_bootstrap" {
+  description = "Use a static Kubernetes provider configuration during the initial EKS bootstrap."
+  type        = bool
+  default     = false
+}
+
+variable "kubernetes_host" {
+  description = "EKS Kubernetes API endpoint used by the Helm and Kubernetes providers."
+  type        = string
+  default     = ""
+}
+
+variable "kubernetes_ca_certificate" {
+  description = "Base64-encoded EKS cluster CA certificate."
+  type        = string
+  default     = ""
+}
+
+variable "kubernetes_cluster_name" {
+  description = "EKS cluster name used by the AWS exec authentication."
+  type        = string
+  default     = ""
+}
