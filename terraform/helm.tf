@@ -80,7 +80,9 @@ resource "helm_release" "external_secrets" {
   timeout = 720
 
   depends_on = [
-    module.eks
+    module.eks,
+    helm_release.aws_load_balancer_controller,
+    null_resource.aws_load_balancer_webhook_ready,
   ]
 
   values = [
@@ -89,7 +91,6 @@ resource "helm_release" "external_secrets" {
     })
   ]
 }
-
 
 # -----------------------------------------------------------------------------
 # cert-manager
