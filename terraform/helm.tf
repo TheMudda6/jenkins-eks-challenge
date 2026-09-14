@@ -53,6 +53,23 @@ resource "helm_release" "aws_load_balancer_controller" {
 
 }
 
+resource "null_resource" "aws_load_balancer_webhook_ready" {
+  depends_on = [
+    helm_release.aws_load_balancer_controller,
+  ]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      kubectl wait \
+        --for=jsonpath='{.endpoints[0].addresses[0]}' \
+        endpointslice \
+        -l kubernetes.io/service-name=aws-load-balancer-webhook-service \
+        -n kube-system \
+        --timeout=300s
+    EOT
+  }
+}
+
 resource "helm_release" "external_secrets" {
   name             = "external-secrets"
   repository       = "https://charts.external-secrets.io"
@@ -223,6 +240,7 @@ resource "helm_release" "traefik" {
   depends_on = [
     module.eks,
     helm_release.aws_load_balancer_controller,
+    null_resource.aws_load_balancer_webhook_ready,
   ]
 }
 
@@ -251,5 +269,7 @@ resource "helm_release" "metrics_server" {
 
   depends_on = [
     module.eks,
+    helm_release.aws_load_balancer_controller,
+    null_resource.aws_load_balancer_webhook_ready,
   ]
 }

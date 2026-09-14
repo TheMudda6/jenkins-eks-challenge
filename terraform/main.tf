@@ -238,4 +238,8 @@ module "karpenter" {
 
   namespace     = "kube-system"
   chart_version = var.karpenter_chart_version
+
+  depends_on = [
+    null_resource.aws_load_balancer_webhook_ready,
+  ]
 }
