@@ -302,6 +302,88 @@ fi
 # Terraform destroy plan
 # ------------------------------------------------------------
 
+print_banner "Preserving ECR Repositories"
+
+for service in \
+  api-gateway \
+  order-service \
+  inventory-service \
+  payment-service \
+  notification-service \
+  shipping-service \
+  dashboard-api \
+  scheduler \
+  worker
+do
+  terraform state rm \
+    "module.ecr.aws_ecr_repository.services[\"$service\"]" \
+    2>/dev/null || true
+done
+
+echo "✓ ECR repositories released from Terraform state."
+echo "✓ ECR repositories and images will be preserved."
+
+print_banner "Terraform Destroy Plan"
+
+KUBERNETES_HOST="$(terraform output -raw cluster_endpoint)"
+KUBERNETES_CA_CERTIFICATE="$(terraform output -raw cluster_certificate_authority_data)"
+KUBERNETES_CLUSTER_NAME="$(terraform output -raw cluster_name)"
+
+terraform plan -destroy \
+  -var="terraform_bootstrap=false" \
+  -var="kubernetes_host=$KUBERNETES_HOST" \
+  -var="kubernetes_ca_certificate=$KUBERNETES_CA_CERTIFICATE" \
+  -var="kubernetes_cluster_name=$KUBERNETES_CLUSTER_NAME" \
+  -out=destroy.tfplan
+
+echo
+echo "Terraform destroy plan created."
+echo
+read -r -p "Apply this destroy plan? Type 'yes' to proceed: " DESTROY_CONFIRM
+
+if [ "$DESTROY_CONFIRM" != "yes" ]; then
+  rm -f destroy.tfplan
+  echo "Destroy cancelled."
+  exit 0
+fi
+
+# ------------------------------------------------------------
+# Terraform destroy
+# ------------------------------------------------------------
+
+print_banner "Terraform Destroy"
+
+if terraform apply -auto-approve destroy.tfplan; then
+
+  # Terraform has successfully destroyed the EKS platform.
+  # Confirm the cluster is gone before removing any leftover
+  # Kubernetes security groups.
+  print_banner "Verifying EKS Cluster Deletion"
+  for attempt in {1..60}; do
+    EKS_STATUS="$(
+      aws eks describe-cluster \
+        --name "$CLUSTER_NAME" \
+        --region "$AWS_REGION" \
+        --query 'cluster.status' \
+        --output text \
+        2>/dev/null || true
+    )"
+
+    if [[ -z "$EKS_STATUS" || "$EKS_STATUS" == "None" ]]; then
+      echo "✓ EKS cluster is fully deleted."
+      break
+    fi
+
+    echo "EKS cluster status: $EKS_STATUS"
+    sleep 10
+  done
+
+  if [[ -n "$EKS_STATUS" && "$EKS_STATUS" != "None" ]]; then
+    echo "ERROR: EKS cluster still exists after Terraform destroy."
+    exit 1
+  fi
+
+
 # ------------------------------------------------------------
 # Kubernetes security group cleanup
 # ------------------------------------------------------------
@@ -356,62 +438,6 @@ else
   echo "✓ VPC no longer exists; no Kubernetes security groups to clean up."
 fi
 
-# ------------------------------------------------------------
-# Terraform destroy plan
-# ------------------------------------------------------------
-
-print_banner "Preserving ECR Repositories"
-
-for service in \
-  api-gateway \
-  order-service \
-  inventory-service \
-  payment-service \
-  notification-service \
-  shipping-service \
-  dashboard-api \
-  scheduler \
-  worker
-do
-  terraform state rm \
-    "module.ecr.aws_ecr_repository.services[\"$service\"]" \
-    2>/dev/null || true
-done
-
-echo "✓ ECR repositories released from Terraform state."
-echo "✓ ECR repositories and images will be preserved."
-
-print_banner "Terraform Destroy Plan"
-
-KUBERNETES_HOST="$(terraform output -raw cluster_endpoint)"
-KUBERNETES_CA_CERTIFICATE="$(terraform output -raw cluster_certificate_authority_data)"
-KUBERNETES_CLUSTER_NAME="$(terraform output -raw cluster_name)"
-
-terraform plan -destroy \
-  -var="terraform_bootstrap=false" \
-  -var="kubernetes_host=$KUBERNETES_HOST" \
-  -var="kubernetes_ca_certificate=$KUBERNETES_CA_CERTIFICATE" \
-  -var="kubernetes_cluster_name=$KUBERNETES_CLUSTER_NAME" \
-  -out=destroy.tfplan
-
-echo
-echo "Terraform destroy plan created."
-echo
-read -r -p "Apply this destroy plan? Type 'yes' to proceed: " DESTROY_CONFIRM
-
-if [ "$DESTROY_CONFIRM" != "yes" ]; then
-  rm -f destroy.tfplan
-  echo "Destroy cancelled."
-  exit 0
-fi
-
-# ------------------------------------------------------------
-# Terraform destroy
-# ------------------------------------------------------------
-
-print_banner "Terraform Destroy"
-
-if terraform apply -auto-approve destroy.tfplan; then
   rm -f destroy.tfplan
   echo "✓ Terraform infrastructure destroyed."
 else
