@@ -188,6 +188,34 @@ done
 
 echo "✓ ArgoCD Applications released."
 
+  print_banner "Cleaning Up External Secrets"
+
+  if kubectl get namespace external-secrets >/dev/null 2>&1; then
+    echo "Deleting External Secrets Helm release..."
+
+    if helm uninstall external-secrets \
+      --namespace external-secrets \
+      --wait \
+      --timeout 12m; then
+      echo "✓ External Secrets Helm release removed."
+    else
+      echo "ERROR: External Secrets Helm uninstall failed."
+      exit 1
+    fi
+
+    kubectl wait \
+      --for=delete \
+      deployment/external-secrets \
+      -n external-secrets \
+      --timeout=120s \
+      2>/dev/null || true
+
+    terraform state rm 'helm_release.external_secrets' 2>/dev/null || true
+    echo "✓ External Secrets released from Terraform state."
+  else
+    echo "✓ External Secrets namespace does not exist."
+  fi  
+
 print_banner "Cleaning Up Traefik Load Balancer"
 
 TRAEFIK_NLB_ARN=""
@@ -345,6 +373,46 @@ if [ "$DESTROY_CONFIRM" != "yes" ]; then
   rm -f destroy.tfplan
   echo "Destroy cancelled."
   exit 0
+fi
+
+print_banner "Cleaning Up ExternalDNS Records"
+
+ROUTE53_ZONE_ID="$(
+  aws route53 list-hosted-zones-by-name \
+    --dns-name "jenkins.mud-as-sir.uk." \
+    --query 'HostedZones[?Name==`jenkins.mud-as-sir.uk.` && Config.PrivateZone==`false`].Id | [0]' \
+    --output text
+)"
+
+if [[ -n "$ROUTE53_ZONE_ID" && "$ROUTE53_ZONE_ID" != "None" ]]; then
+  ROUTE53_ZONE_ID="${ROUTE53_ZONE_ID##*/}"
+
+  echo "Cleaning Route53 records for jenkins.mud-as-sir.uk..."
+
+  ROUTE53_RECORDS="$(
+    aws route53 list-resource-record-sets \
+      --hosted-zone-id "$ROUTE53_ZONE_ID" \
+      --query "ResourceRecordSets[?Name=='jenkins.mud-as-sir.uk.' && (Type=='A' || Type=='AAAA' || Type=='TXT')]" \
+      --output json
+  )"
+
+  if [[ "$ROUTE53_RECORDS" != "[]" ]]; then
+    jq -n \
+      --argjson records "$ROUTE53_RECORDS" \
+      '{Changes: [$records[] | {Action:"DELETE", ResourceRecordSet:.}]}' \
+      > route53-destroy.json
+
+    aws route53 change-resource-record-sets \
+      --hosted-zone-id "$ROUTE53_ZONE_ID" \
+      --change-batch file://route53-destroy.json
+
+    rm -f route53-destroy.json
+    echo "✓ Route53 A/AAAA/TXT records removed."
+  else
+    echo "✓ No project DNS records found."
+  fi
+else
+  echo "✓ Project Route53 hosted zone not found."
 fi
 
 # ------------------------------------------------------------
