@@ -193,28 +193,29 @@ echo "✓ ArgoCD Applications released."
   if kubectl get namespace external-secrets >/dev/null 2>&1; then
     echo "Deleting External Secrets Helm release..."
 
-    if helm uninstall external-secrets \
-      --namespace external-secrets \
-      --wait \
-      --timeout 12m; then
-      echo "✓ External Secrets Helm release removed."
-    else
-      echo "ERROR: External Secrets Helm uninstall failed."
-      exit 1
-    fi
+if helm status external-secrets \
+  --namespace external-secrets >/dev/null 2>&1; then
 
-    kubectl wait \
-      --for=delete \
-      deployment/external-secrets \
-      -n external-secrets \
-      --timeout=120s \
-      2>/dev/null || true
+  echo "Deleting External Secrets Helm release..."
 
-    terraform state rm 'helm_release.external_secrets' 2>/dev/null || true
-    echo "✓ External Secrets released from Terraform state."
+  if helm uninstall external-secrets \
+    --namespace external-secrets \
+    --wait \
+    --timeout 12m; then
+    echo "✓ External Secrets Helm release removed."
   else
-    echo "✓ External Secrets namespace does not exist."
-  fi  
+    echo "ERROR: External Secrets Helm uninstall failed."
+    exit 1
+  fi
+
+else
+  echo "✓ External Secrets Helm release is already absent."
+fi
+
+terraform state rm 'helm_release.external_secrets' 2>/dev/null || true
+echo "✓ External Secrets released from Terraform state."
+
+fi
 
 print_banner "Cleaning Up Traefik Load Balancer"
 
