@@ -11,3 +11,4 @@ resources:
   - monitoring.yaml
   - monitoring-stack.yaml
   - cert-manager.yaml
+  - security.yaml
