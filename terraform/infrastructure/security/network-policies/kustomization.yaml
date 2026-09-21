@@ -12,3 +12,12 @@ resources:
   - allow-api-gateway-to-dashboard-api.yaml
   - allow-api-gateway-to-redis.yaml
   - allow-apps-to-postgres.yaml
+  - allow-prometheus-to-api-gateway.yaml
+  - allow-prometheus-to-order-service.yaml
+  - allow-prometheus-to-inventory-service.yaml
+  - allow-prometheus-to-payment-service.yaml
+  - allow-prometheus-to-notification-service.yaml
+  - allow-prometheus-to-shipping-service.yaml
+  - allow-prometheus-to-dashboard-api.yaml
+  - allow-prometheus-to-worker.yaml
+  - allow-prometheus-to-scheduler.yaml
