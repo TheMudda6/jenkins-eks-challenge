@@ -158,7 +158,8 @@ for application in \
   secrets \
   storage \
   monitoring \
-  monitoring-stack
+  monitoring-stack \
+  security
 do
   kubectl delete application "$application" \
     -n argocd \
@@ -176,7 +177,8 @@ for application in \
   secrets \
   storage \
   monitoring \
-  monitoring-stack
+  monitoring-stack \
+  security
 do
   kubectl wait \
     --for=delete \
