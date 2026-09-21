@@ -16,7 +16,7 @@ spec:
       serviceAccountName: api-gateway
       containers:
         - name: api-gateway
-          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-api-gateway:025c6cb4d8c2bfdb878ace36825c18f97438ce5b
+          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-api-gateway:44ce8d397d9f79eb3b70469ce1076b5a8af98fcc
           imagePullPolicy: Always
           ports:
             - name: http
