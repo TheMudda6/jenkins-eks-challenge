@@ -302,7 +302,8 @@ redis \
 secrets \
 storage \
 monitoring \
-monitoring-stack
+monitoring-stack \
+security
 do
   if ! kubectl get application "$application" -n argocd >/dev/null 2>&1; then
     echo "ERROR: ArgoCD Application '$application' was not created."
