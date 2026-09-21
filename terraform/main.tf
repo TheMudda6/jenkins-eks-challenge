@@ -138,6 +138,10 @@ module "argocd" {
 
   namespace     = "argocd"
   chart_version = var.argocd_chart_version
+
+  depends_on = [
+    null_resource.aws_load_balancer_webhook_ready,
+  ]
 }
 
 # -----------------------------------------------------------------------------

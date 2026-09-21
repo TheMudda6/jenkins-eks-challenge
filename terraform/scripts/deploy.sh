@@ -230,6 +230,17 @@ kubectl wait \
 
 echo "✓ AWS Load Balancer Controller is ready."
 
+echo "Waiting for AWS Load Balancer Controller webhook..."
+
+until kubectl get endpoints aws-load-balancer-webhook-service \
+  -n kube-system \
+  -o jsonpath='{.subsets[*].addresses[*].ip}' \
+  2>/dev/null | grep -q '[0-9]'; do
+  sleep 5
+done
+
+echo "✓ AWS Load Balancer Controller webhook is ready."
+
 kubectl wait \
   --for=condition=Available \
   deployment/ebs-csi-controller \
