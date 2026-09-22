@@ -206,8 +206,16 @@ if helm status external-secrets \
     --timeout 12m; then
     echo "✓ External Secrets Helm release removed."
   else
-    echo "ERROR: External Secrets Helm uninstall failed."
-    exit 1
+    echo "WARNING: External Secrets Helm uninstall returned an error."
+    echo "Verifying whether the release was actually removed..."
+
+    if helm status external-secrets \
+      --namespace external-secrets >/dev/null 2>&1; then
+      echo "ERROR: External Secrets Helm release still exists."
+      exit 1
+    fi
+
+    echo "✓ External Secrets Helm release is no longer present; continuing."
   fi
 
 else
