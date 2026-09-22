@@ -193,39 +193,49 @@ echo "✓ ArgoCD Applications released."
   print_banner "Cleaning Up External Secrets"
 
   if kubectl get namespace external-secrets >/dev/null 2>&1; then
-    echo "Deleting External Secrets Helm release..."
-
-if helm status external-secrets \
-  --namespace external-secrets >/dev/null 2>&1; then
-
-  echo "Deleting External Secrets Helm release..."
-
-  if helm uninstall external-secrets \
-    --namespace external-secrets \
-    --wait \
-    --timeout 12m; then
-    echo "✓ External Secrets Helm release removed."
-  else
-    echo "WARNING: External Secrets Helm uninstall returned an error."
-    echo "Verifying whether the release was actually removed..."
 
     if helm status external-secrets \
       --namespace external-secrets >/dev/null 2>&1; then
-      echo "ERROR: External Secrets Helm release still exists."
-      exit 1
+
+      echo "Deleting External Secrets Helm release..."
+
+      if helm uninstall external-secrets \
+        --namespace external-secrets \
+        --timeout 2m; then
+
+        if kubectl get secret \
+          sh.helm.release.v1.external-secrets.v1 \
+          -n external-secrets >/dev/null 2>&1; then
+          echo "WARNING: External Secrets Helm release secret still exists."
+        else
+          echo "✓ External Secrets Helm release removed."
+        fi
+
+      else
+
+        echo "WARNING: External Secrets Helm uninstall returned an error."
+        echo "Verifying whether the release was actually removed..."
+
+        if helm status external-secrets \
+          --namespace external-secrets >/dev/null 2>&1; then
+          echo "ERROR: External Secrets Helm release still exists."
+          exit 1
+        fi
+
+        echo "✓ External Secrets Helm release is no longer present; continuing."
+
+      fi
+
+    else
+
+      echo "✓ External Secrets Helm release is already absent."
+
     fi
 
-    echo "✓ External Secrets Helm release is no longer present; continuing."
+    terraform state rm 'helm_release.external_secrets' 2>/dev/null || true
+    echo "✓ External Secrets released from Terraform state."
+
   fi
-
-else
-  echo "✓ External Secrets Helm release is already absent."
-fi
-
-terraform state rm 'helm_release.external_secrets' 2>/dev/null || true
-echo "✓ External Secrets released from Terraform state."
-
-fi
 
 print_banner "Cleaning Up Traefik Load Balancer"
 
