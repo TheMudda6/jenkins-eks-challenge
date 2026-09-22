@@ -238,6 +238,11 @@ resource "helm_release" "traefik" {
     value = "true"
   }
 
+  set {
+    name  = "additionalArguments"
+    value = "--entryPoints.web.http.redirections.entryPoint.to=websecure"
+  }
+
   depends_on = [
     module.eks,
     helm_release.aws_load_balancer_controller,
