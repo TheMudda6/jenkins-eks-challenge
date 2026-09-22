@@ -59,3 +59,25 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
 }
+
+# -----------------------------------------------------------------------------
+# Amazon VPC CNI Add-on
+#
+# Purpose:
+# Installs the Amazon VPC CNI as an EKS-managed add-on.
+#
+# NetworkPolicy enforcement is enabled so Kubernetes NetworkPolicy resources
+# are enforced by the AWS VPC CNI networking layer.
+# -----------------------------------------------------------------------------
+
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name = aws_eks_cluster.main.name
+  addon_name   = "vpc-cni"
+
+  configuration_values = jsonencode({
+    enableNetworkPolicy = "true"
+  })
+
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+}
