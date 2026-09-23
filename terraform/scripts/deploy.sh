@@ -306,7 +306,6 @@ echo
 echo "Checking required Applications..."
 
 for application in \
-e-commerce-dev \
 e-commerce-prod \
 postgres \
 redis \
