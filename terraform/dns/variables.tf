@@ -12,6 +12,12 @@ variable "aws_region" {
   type        = string
 }
 
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token used to manage DNS delegation."
+  type        = string
+  sensitive   = true
+}
+
 variable "jenkins_zone_name" {
   description = "Route 53 hosted zone name delegated to Jenkins."
   type        = string
