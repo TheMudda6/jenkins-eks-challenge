@@ -41,6 +41,17 @@ jobs:
         run:
           terraform validate
 
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: Initialize TFLint
+        working-directory: terraform
+        run: tflint --init
+
+      - name: Run TFLint
+        working-directory: terraform
+        run: tflint --format compact
+
   shell:
     name: Shell Validation
     runs-on: ubuntu-latest
