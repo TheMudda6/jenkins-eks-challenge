@@ -86,3 +86,8 @@ variable "ebs_csi_driver_role_arn" {
   description = "ARN of the IAM role used by the Amazon EBS CSI Driver add-on."
   type        = string
 }
+
+variable "github_actions_terraform_role_arn" {
+  description = "ARN of the IAM role used by GitHub Actions for Terraform deployments."
+  type        = string
+}

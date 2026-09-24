@@ -62,7 +62,8 @@ module "iam" {
   event_producer_policy_name               = var.event_producer_policy_name
   event_worker_policy_name                 = var.event_worker_policy_name
 
-  github_actions_oidc_role_name = var.github_actions_oidc_role_name
+  github_actions_oidc_role_name      = var.github_actions_oidc_role_name
+  github_actions_terraform_role_name = var.github_actions_terraform_role_name
 
   ecr_repository_arns = toset(values(module.ecr.repository_arns))
 
@@ -121,7 +122,8 @@ module "eks" {
 
   tags = var.tags
 
-  ebs_csi_driver_role_arn = module.iam.ebs_csi_driver_role_arn
+  ebs_csi_driver_role_arn           = module.iam.ebs_csi_driver_role_arn
+  github_actions_terraform_role_arn = module.iam.github_actions_terraform_role_arn
 }
 
 # -----------------------------------------------------------------------------
@@ -246,4 +248,9 @@ module "karpenter" {
   depends_on = [
     null_resource.aws_load_balancer_webhook_ready,
   ]
+}
+
+output "github_actions_terraform_role_arn" {
+  description = "GitHub Actions Terraform IAM Role ARN"
+  value       = module.iam.github_actions_terraform_role_arn
 }

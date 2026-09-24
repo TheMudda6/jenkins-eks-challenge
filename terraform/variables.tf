@@ -308,6 +308,11 @@ variable "github_actions_oidc_role_name" {
   type = string
 }
 
+variable "github_actions_terraform_role_name" {
+  description = "IAM Role name for GitHub Actions Terraform deployments."
+  type        = string
+}
+
 variable "argocd_chart_version" {
   description = "Version of the ArgoCD Helm chart."
   type        = string

@@ -60,7 +60,7 @@ cd "$TERRAFORM_DIR"
 
 print_banner "Terraform Validation"
 
-terraform fmt -recursive
+terraform fmt -check -recursive
 terraform validate
 
 echo "✓ Terraform configuration validated."
@@ -185,20 +185,6 @@ terraform apply tfplan-platform
 rm -f tfplan-platform
 
 echo "✓ Terraform platform apply complete."
-
-# ------------------------------------------------------------
-# Kubernetes configuration
-# ------------------------------------------------------------
-
-print_banner "Configuring Kubernetes"
-
-aws eks update-kubeconfig \
-  --region "$AWS_REGION" \
-  --name "$CLUSTER_NAME"
-
-kubectl get nodes
-
-echo "✓ Kubernetes connectivity verified."
 
 # ------------------------------------------------------------
 # Verify platform controllers

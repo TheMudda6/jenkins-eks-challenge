@@ -73,7 +73,7 @@ fi
 
 cd "$TERRAFORM_DIR"
 
-terraform fmt -recursive
+terraform fmt -check -recursive
 terraform validate
 
 echo "✓ Terraform configuration validated."
@@ -151,7 +151,6 @@ echo
 echo "Deleting ArgoCD child Applications..."
 
 for application in \
-  e-commerce-dev \
   e-commerce-prod \
   postgres \
   redis \
@@ -170,7 +169,6 @@ echo
 echo "Waiting for ArgoCD child Applications to disappear..."
 
 for application in \
-  e-commerce-dev \
   e-commerce-prod \
   postgres \
   redis \
@@ -472,9 +470,56 @@ if terraform apply -auto-approve destroy.tfplan; then
     exit 1
   fi
 
+  rm -f destroy.tfplan
+  echo "✓ Terraform infrastructure destroyed."
+
+else
+
+  echo
+  echo "WARNING: Terraform destroy encountered an error."
+  echo "Waiting 30 seconds before retrying with a fresh destroy plan..."
+  echo
+
+  rm -f destroy.tfplan
+
+  sleep 30
+
+  print_banner "Terraform Destroy Retry Plan"
+
+  terraform plan -destroy \
+    -var="terraform_bootstrap=false" \
+    -var="kubernetes_host=$KUBERNETES_HOST" \
+    -var="kubernetes_ca_certificate=$KUBERNETES_CA_CERTIFICATE" \
+    -var="kubernetes_cluster_name=$KUBERNETES_CLUSTER_NAME" \
+    -out=destroy-retry.tfplan
+
+  echo
+  echo "Terraform retry destroy plan created."
+  echo
+  echo "Review the retry plan above before continuing."
+  echo
+  read -r -p "Apply this retry destroy plan? Type 'yes' to proceed: " RETRY_CONFIRM
+
+  if [ "$RETRY_CONFIRM" != "yes" ]; then
+    rm -f destroy-retry.tfplan
+    echo "Retry destroy cancelled."
+    exit 0
+  fi
+
+  print_banner "Terraform Destroy Retry Apply"
+
+  terraform apply destroy-retry.tfplan
+
+  rm -f destroy-retry.tfplan
+
+  echo "✓ Terraform infrastructure destroyed."
+
+fi
 
 # ------------------------------------------------------------
+
 # Kubernetes security group cleanup
+
 # ------------------------------------------------------------
 
 print_banner "Cleaning Up Kubernetes Security Groups"
@@ -510,6 +555,7 @@ if [[ -n "$VPC_ID" && "$VPC_ID" != "None" ]]; then
           --region "$AWS_REGION" \
           --group-id "$group_id" \
           >/dev/null 2>&1; then
+
           echo "✓ Deleted security group: $group_id"
           break
         fi
@@ -525,34 +571,6 @@ if [[ -n "$VPC_ID" && "$VPC_ID" != "None" ]]; then
   done
 else
   echo "✓ VPC no longer exists; no Kubernetes security groups to clean up."
-fi
-
-  rm -f destroy.tfplan
-  echo "✓ Terraform infrastructure destroyed."
-else
-  echo
-  echo "WARNING: Terraform destroy encountered an error."
-  echo "Waiting 30 seconds before retrying with a fresh destroy plan..."
-  echo
-
-  rm -f destroy.tfplan
-
-  sleep 30
-
-  print_banner "Terraform Destroy Retry"
-
-  terraform plan -destroy \
-  -var="terraform_bootstrap=false" \
-  -var="kubernetes_host=$KUBERNETES_HOST" \
-  -var="kubernetes_ca_certificate=$KUBERNETES_CA_CERTIFICATE" \
-  -var="kubernetes_cluster_name=$KUBERNETES_CLUSTER_NAME" \
-  -out=destroy-retry.tfplan
-
-  terraform apply -auto-approve destroy-retry.tfplan
-
-  rm -f destroy-retry.tfplan
-
-  echo "✓ Terraform infrastructure destroyed."
 fi
 
 # ------------------------------------------------------------
@@ -578,22 +596,25 @@ echo "✓ Terraform state is empty."
 
 print_banner "AWS Cleanup Verification"
 
-echo "Remaining EKS clusters:"
+echo "Project EKS cluster:"
 
-REMAINING_CLUSTERS="$(
-  aws eks list-clusters \
+REMAINING_CLUSTER_STATUS="$(
+  aws eks describe-cluster \
+    --name "$CLUSTER_NAME" \
     --region "$AWS_REGION" \
-    --query 'clusters[]' \
-    --output text
+    --query 'cluster.status' \
+    --output text \
+    2>/dev/null || true
 )"
 
-if [[ -n "$REMAINING_CLUSTERS" ]]; then
-  echo "$REMAINING_CLUSTERS"
-  echo "ERROR: EKS clusters still exist."
+if [[ -n "$REMAINING_CLUSTER_STATUS" && "$REMAINING_CLUSTER_STATUS" != "None" ]]; then
+  echo "EKS cluster status: $REMAINING_CLUSTER_STATUS"
+  echo "ERROR: Project EKS cluster still exists."
   exit 1
 fi
 
-echo "✓ No EKS clusters remain."
+echo "✓ Project EKS cluster does not exist."
+
 echo
 echo "Remaining Jenkins VPCs:"
 
@@ -613,22 +634,27 @@ fi
 
 echo "✓ No Jenkins VPCs remain."
 echo
-echo "Remaining Load Balancers:"
 
-REMAINING_LOAD_BALANCERS="$(
-  aws elbv2 describe-load-balancers \
-    --region "$AWS_REGION" \
-    --query 'LoadBalancers[].LoadBalancerArn' \
-    --output text
-)"
+echo "Remaining project Load Balancers:"
 
-if [[ -n "$REMAINING_LOAD_BALANCERS" ]]; then
-  echo "$REMAINING_LOAD_BALANCERS"
-  echo "ERROR: Load Balancers still exist."
+REMAINING_PROJECT_LOAD_BALANCERS=""
+
+if [[ -n "$PROJECT_VPC_ID" ]]; then
+  REMAINING_PROJECT_LOAD_BALANCERS="$(
+    aws elbv2 describe-load-balancers \
+      --region "$AWS_REGION" \
+      --query "LoadBalancers[?VpcId=='$PROJECT_VPC_ID'].LoadBalancerArn" \
+      --output text
+  )"
+fi
+
+if [[ -n "$REMAINING_PROJECT_LOAD_BALANCERS" && "$REMAINING_PROJECT_LOAD_BALANCERS" != "None" ]]; then
+  echo "$REMAINING_PROJECT_LOAD_BALANCERS"
+  echo "ERROR: Project Load Balancers still exist."
   exit 1
 fi
 
-echo "✓ No Load Balancers remain."
+echo "✓ No project Load Balancers remain."
 
 echo
 echo "Remaining EKS CloudWatch log groups:"
@@ -702,23 +728,29 @@ aws ecr describe-repositories \
   --output text
 
 echo
-echo "Remaining NAT gateways:"
+echo "Remaining project NAT gateways:"
 
-REMAINING_NAT_GATEWAYS="$(
-  aws ec2 describe-nat-gateways \
-    --region "$AWS_REGION" \
-    --filter "Name=state,Values=pending,available,deleting" \
-    --query 'NatGateways[].NatGatewayId' \
-    --output text
-)"
+REMAINING_PROJECT_NAT_GATEWAYS=""
 
-if [[ -n "$REMAINING_NAT_GATEWAYS" ]]; then
-  echo "$REMAINING_NAT_GATEWAYS"
-  echo "ERROR: NAT gateways still exist."
+if [[ -n "$PROJECT_VPC_ID" ]]; then
+  REMAINING_PROJECT_NAT_GATEWAYS="$(
+    aws ec2 describe-nat-gateways \
+      --region "$AWS_REGION" \
+      --filter \
+        "Name=vpc-id,Values=$PROJECT_VPC_ID" \
+        "Name=state,Values=pending,available,deleting" \
+      --query 'NatGateways[].NatGatewayId' \
+      --output text
+  )"
+fi
+
+if [[ -n "$REMAINING_PROJECT_NAT_GATEWAYS" && "$REMAINING_PROJECT_NAT_GATEWAYS" != "None" ]]; then
+  echo "$REMAINING_PROJECT_NAT_GATEWAYS"
+  echo "ERROR: Project NAT gateways still exist."
   exit 1
 fi
 
-echo "✓ No NAT gateways remain."
+echo "✓ No project NAT gateways remain."
 
 echo
 

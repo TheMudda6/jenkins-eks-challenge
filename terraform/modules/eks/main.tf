@@ -13,11 +13,32 @@ resource "aws_eks_cluster" "main" {
   role_arn = var.cluster_role_arn
   version  = var.cluster_version
 
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+
+  }
+
   # Defines which subnets the EKS control plane and managed networking
   # components use for cluster communication.
 
   vpc_config {
     subnet_ids = var.subnet_ids
+  }
+}
+
+resource "aws_eks_access_entry" "github_actions_terraform" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = var.github_actions_terraform_role_arn
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "github_actions_terraform" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = var.github_actions_terraform_role_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
   }
 }
 
