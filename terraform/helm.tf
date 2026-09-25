@@ -239,7 +239,7 @@ resource "helm_release" "traefik" {
   }
 
   set {
-    name  = "additionalArguments"
+    name  = "additionalArguments[0]"
     value = "--entryPoints.web.http.redirections.entryPoint.to=websecure"
   }
 

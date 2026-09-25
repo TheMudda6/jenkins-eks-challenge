@@ -313,6 +313,11 @@ variable "github_actions_terraform_role_name" {
   type        = string
 }
 
+variable "local_deployment_principal_arn" {
+  description = "ARN of the IAM principal used for local Terraform and Kubernetes deployments."
+  type        = string
+}
+
 variable "argocd_chart_version" {
   description = "Version of the ArgoCD Helm chart."
   type        = string

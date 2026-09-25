@@ -15,12 +15,10 @@ resource "aws_eks_cluster" "main" {
 
   access_config {
     authentication_mode = "API_AND_CONFIG_MAP"
-
   }
 
   # Defines which subnets the EKS control plane and managed networking
   # components use for cluster communication.
-
   vpc_config {
     subnet_ids = var.subnet_ids
   }
@@ -40,6 +38,30 @@ resource "aws_eks_access_policy_association" "github_actions_terraform" {
   access_scope {
     type = "cluster"
   }
+
+  depends_on = [
+    aws_eks_access_entry.github_actions_terraform,
+  ]
+}
+
+resource "aws_eks_access_entry" "local_deployment" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = var.local_deployment_principal_arn
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "local_deployment" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = var.local_deployment_principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [
+    aws_eks_access_entry.local_deployment,
+  ]
 }
 
 # -----------------------------------------------------------------------------
@@ -76,7 +98,6 @@ resource "aws_eks_addon" "ebs_csi_driver" {
 
   # Ensure Terraform replaces any existing EBS CSI Driver configuration
   # so the cluster matches the desired state defined in code.
-
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
 }

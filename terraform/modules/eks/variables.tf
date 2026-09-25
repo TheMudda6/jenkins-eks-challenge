@@ -91,3 +91,8 @@ variable "github_actions_terraform_role_arn" {
   description = "ARN of the IAM role used by GitHub Actions for Terraform deployments."
   type        = string
 }
+
+variable "local_deployment_principal_arn" {
+  description = "ARN of the IAM principal used for local Terraform and Kubernetes deployments."
+  type        = string
+}

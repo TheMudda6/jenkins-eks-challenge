@@ -111,8 +111,9 @@ module "eks" {
 
   subnet_ids = module.vpc.private_subnets
 
-  cluster_role_arn = module.iam.eks_cluster_role_arn
-  node_role_arn    = module.iam.node_group_role_arn
+  cluster_role_arn               = module.iam.eks_cluster_role_arn
+  node_role_arn                  = module.iam.node_group_role_arn
+  local_deployment_principal_arn = var.local_deployment_principal_arn
 
   min_size     = var.min_size
   desired_size = var.desired_size
