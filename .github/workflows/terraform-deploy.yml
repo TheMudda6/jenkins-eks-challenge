@@ -1,0 +1,64 @@
+name: Terraform Deployment
+
+on:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform-deploy.yml"
+  push:
+    branches:
+      - stable-v1.31
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform-deploy.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+  TF_WORKING_DIR: terraform
+
+jobs:
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Configure Kubernetes provider
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "TF_VAR_kubernetes_host=$(terraform output -raw cluster_endpoint)" >> "$GITHUB_ENV"
+          echo "TF_VAR_kubernetes_ca_certificate=$(terraform output -raw cluster_certificate_authority_data)" >> "$GITHUB_ENV"
+          echo "TF_VAR_kubernetes_cluster_name=$(terraform output -raw cluster_name)" >> "$GITHUB_ENV"
+
+      - name: Terraform Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan -out=tfplan
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: terraform/tfplan
+          if-no-files-found: error
