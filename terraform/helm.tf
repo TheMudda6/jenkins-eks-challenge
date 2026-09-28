@@ -126,6 +126,8 @@ resource "helm_release" "cert_manager" {
   depends_on = [
     module.eks,
     module.iam,
+    helm_release.aws_load_balancer_controller,
+    null_resource.aws_load_balancer_webhook_ready,
   ]
 }
 
