@@ -52,6 +52,12 @@ jobs:
           echo "TF_VAR_kubernetes_ca_certificate=$(terraform output -raw cluster_certificate_authority_data)" >> "$GITHUB_ENV"
           echo "TF_VAR_kubernetes_cluster_name=$(terraform output -raw cluster_name)" >> "$GITHUB_ENV"
 
+      - name: Verify Kubernetes provider variables
+        run: |
+          printf 'TF_VAR_kubernetes_host length: %s\n' "${#TF_VAR_kubernetes_host}"
+          printf 'TF_VAR_kubernetes_ca_certificate length: %s\n' "${#TF_VAR_kubernetes_ca_certificate}"
+          printf 'TF_VAR_kubernetes_cluster_name: %s\n' "$TF_VAR_kubernetes_cluster_name"
+
       - name: Terraform Plan
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform plan -out=tfplan
