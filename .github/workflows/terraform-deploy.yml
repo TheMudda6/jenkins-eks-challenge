@@ -21,8 +21,8 @@ env:
   TF_WORKING_DIR: terraform
 
 jobs:
-  plan:
-    name: Terraform Plan
+  bootstrap-plan:
+    name: Terraform Bootstrap Plan
     runs-on: ubuntu-latest
 
     steps:
@@ -45,26 +45,23 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform init
 
-      - name: Configure Kubernetes provider
+      - name: Terraform Bootstrap Plan
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          echo "TF_VAR_kubernetes_host=$(terraform output -raw cluster_endpoint)" >> "$GITHUB_ENV"
-          echo "TF_VAR_kubernetes_ca_certificate=$(terraform output -raw cluster_certificate_authority_data)" >> "$GITHUB_ENV"
-          echo "TF_VAR_kubernetes_cluster_name=$(terraform output -raw cluster_name)" >> "$GITHUB_ENV"
+          terraform plan \
+            -input=false \
+            -var="terraform_bootstrap=true" \
+            -target=module.vpc \
+            -target=module.sqs \
+            -target=module.ecr \
+            -target=module.secrets \
+            -target=module.iam \
+            -target=module.eks \
+            -out=tfplan-bootstrap
 
-      - name: Verify Kubernetes provider variables
-        run: |
-          printf 'TF_VAR_kubernetes_host length: %s\n' "${#TF_VAR_kubernetes_host}"
-          printf 'TF_VAR_kubernetes_ca_certificate length: %s\n' "${#TF_VAR_kubernetes_ca_certificate}"
-          printf 'TF_VAR_kubernetes_cluster_name: %s\n' "$TF_VAR_kubernetes_cluster_name"
-
-      - name: Terraform Plan
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform plan -out=tfplan
-
-      - name: Upload Terraform Plan
+      - name: Upload Terraform Bootstrap Plan
         uses: actions/upload-artifact@v4
         with:
-          name: terraform-plan
-          path: terraform/tfplan
+          name: terraform-bootstrap-plan
+          path: terraform/tfplan-bootstrap
           if-no-files-found: error
