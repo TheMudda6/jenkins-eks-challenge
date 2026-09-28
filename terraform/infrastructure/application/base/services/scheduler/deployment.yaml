@@ -16,7 +16,7 @@ spec:
       serviceAccountName: scheduler
       containers:
         - name: scheduler
-          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-scheduler:7480ef64af0a5bc6a41854c30b888f958f56a942
+          image: 893061519920.dkr.ecr.eu-west-2.amazonaws.com/jenkins-eks-challenge-dev-scheduler:68df14f5f3efba569b0c2ea5b6c569eec75a84fd
           imagePullPolicy: Always
           ports:
             - name: http
