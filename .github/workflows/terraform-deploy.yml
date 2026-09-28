@@ -45,13 +45,16 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform init
 
-      - name: Terraform Plan
+      - name: Configure Kubernetes provider
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          export TF_VAR_kubernetes_host="$(terraform output -raw cluster_endpoint)"
-          export TF_VAR_kubernetes_ca_certificate="$(terraform output -raw cluster_certificate_authority_data)"
-          export TF_VAR_kubernetes_cluster_name="$(terraform output -raw cluster_name)"
-          terraform plan -out=tfplan
+          echo "TF_VAR_kubernetes_host=$(terraform output -raw cluster_endpoint)" >> "$GITHUB_ENV"
+          echo "TF_VAR_kubernetes_ca_certificate=$(terraform output -raw cluster_certificate_authority_data)" >> "$GITHUB_ENV"
+          echo "TF_VAR_kubernetes_cluster_name=$(terraform output -raw cluster_name)" >> "$GITHUB_ENV"
+
+      - name: Terraform Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan -out=tfplan
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
