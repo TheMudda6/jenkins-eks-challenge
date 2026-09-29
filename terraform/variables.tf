@@ -308,8 +308,8 @@ variable "github_actions_oidc_role_name" {
   type = string
 }
 
-variable "github_actions_terraform_role_name" {
-  description = "IAM Role name for GitHub Actions Terraform deployments."
+variable "github_actions_terraform_role_arn" {
+  description = "ARN of the persistent GitHub Actions Terraform IAM role."
   type        = string
 }
 

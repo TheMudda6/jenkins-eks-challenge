@@ -1,17 +1,79 @@
-# --------------------------------------------------------------------
-# GitHub Actions Terraform IAM Role
+# -----------------------------------------------------------------------------
+# GitHub Actions OIDC
 #
 # Purpose:
-# Dedicated role for infrastructure Terraform deployments.
-# This role reuses the existing GitHub OIDC provider and trust policy
-# but remains separate from the application/ECR GitHub Actions role.
-# --------------------------------------------------------------------
+# Provides persistent GitHub Actions authentication for infrastructure
+# Terraform deployments.
+#
+# These resources intentionally live in the bootstrap state so they survive
+# destruction of the disposable EKS environment.
+# -----------------------------------------------------------------------------
+
+resource "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
+
+  client_id_list = [
+    "sts.amazonaws.com"
+  ]
+
+  thumbprint_list = [
+    "ffffffffffffffffffffffffffffffffffffffff"
+  ]
+}
+
+# -----------------------------------------------------------------------------
+# GitHub Actions Trust Policy
+# -----------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "github_actions_assume_role" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "sts:AssumeRoleWithWebIdentity"
+    ]
+
+    principals {
+      type = "Federated"
+
+      identifiers = [
+        aws_iam_openid_connect_provider.github.arn
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+
+      values = [
+        "sts.amazonaws.com"
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+
+      values = [
+        "repo:TheMudda6/jenkins-eks-challenge:*"
+      ]
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# GitHub Actions Terraform IAM Role
+# -----------------------------------------------------------------------------
 
 resource "aws_iam_role" "github_actions_terraform" {
-  name = var.github_actions_terraform_role_name
+  name = "github-actions-terraform-role"
 
   assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role.json
 }
+
+# -----------------------------------------------------------------------------
+# GitHub Actions Terraform Permissions
+# -----------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "github_actions_terraform" {
   statement {
@@ -183,6 +245,7 @@ data "aws_iam_policy_document" "github_actions_terraform" {
     effect = "Allow"
 
     actions = [
+      "iam:GetOpenIDConnectProvider",
       "iam:CreateRole",
       "iam:DeleteRole",
       "iam:GetRole",
@@ -213,9 +276,9 @@ data "aws_iam_policy_document" "github_actions_terraform" {
 
     resources = [
       "arn:aws:iam::893061519920:role/jenkins-*",
-      "arn:aws:iam::893061519920:role/github-actions-*",
+      "arn:aws:iam::893061519920:role/github-actions-oidc-role",
       "arn:aws:iam::893061519920:policy/jenkins-*",
-      "arn:aws:iam::893061519920:policy/github-actions-*"
+      "arn:aws:iam::893061519920:policy/github-actions-ecr-policy"
     ]
   }
 
@@ -282,26 +345,10 @@ data "aws_iam_policy_document" "github_actions_terraform" {
   }
 }
 
-# --------------------------------------------------------------------
-# GitHub Actions Terraform IAM Policy
-#
-# Purpose:
-# Attach the Terraform permissions to the dedicated GitHub Actions
-# Terraform IAM Role.
-# --------------------------------------------------------------------
-
 resource "aws_iam_policy" "github_actions_terraform" {
   name   = "github-actions-terraform-policy"
   policy = data.aws_iam_policy_document.github_actions_terraform.json
 }
-
-# --------------------------------------------------------------------
-# GitHub Actions Terraform Policy Attachment
-#
-# Purpose:
-# Attach the Terraform policy to the dedicated Terraform deployment
-# role.
-# --------------------------------------------------------------------
 
 resource "aws_iam_role_policy_attachment" "github_actions_terraform" {
   role       = aws_iam_role.github_actions_terraform.name

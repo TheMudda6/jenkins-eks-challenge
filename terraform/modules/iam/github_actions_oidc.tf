@@ -6,16 +6,8 @@
 # instead of long-lived AWS access keys.
 # --------------------------------------------------------------------
 
-resource "aws_iam_openid_connect_provider" "github" {
+data "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
-
-  client_id_list = [
-    "sts.amazonaws.com"
-  ]
-
-  thumbprint_list = [
-    "ffffffffffffffffffffffffffffffffffffffff"
-  ]
 }
 
 # --------------------------------------------------------------------
@@ -40,7 +32,7 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
       type = "Federated"
 
       identifiers = [
-        aws_iam_openid_connect_provider.github.arn
+        data.aws_iam_openid_connect_provider.github.arn
       ]
     }
 
