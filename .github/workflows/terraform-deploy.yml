@@ -1,10 +1,6 @@
 name: Terraform Deployment
 
 on:
-  pull_request:
-    paths:
-      - "terraform/**"
-      - ".github/workflows/terraform-deploy.yml"
   push:
     branches:
       - stable-v1.31
@@ -19,6 +15,14 @@ permissions:
 env:
   AWS_REGION: eu-west-2
   TF_WORKING_DIR: terraform
+  TF_VAR_github_actions_oidc_role_name: ${{ vars.TF_GITHUB_ACTIONS_OIDC_ROLE_NAME }}
+  TF_VAR_github_actions_terraform_role_arn: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+  TF_VAR_local_deployment_principal_arn: ${{ vars.TF_LOCAL_DEPLOYMENT_PRINCIPAL_ARN }}
+  TF_VAR_argocd_chart_version: ${{ vars.TF_ARGOCD_CHART_VERSION }}
+
+concurrency:
+  group: terraform-stable-v1.31
+  cancel-in-progress: false
 
 jobs:
   bootstrap-plan:
@@ -65,3 +69,127 @@ jobs:
           name: terraform-bootstrap-plan
           path: terraform/tfplan-bootstrap
           if-no-files-found: error
+
+  bootstrap-apply:
+    name: Terraform Bootstrap Apply
+    needs: bootstrap-plan
+    runs-on: ubuntu-latest
+
+    environment:
+      name: terraform-production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Download Terraform Bootstrap Plan
+        uses: actions/download-artifact@v5
+        with:
+          name: terraform-bootstrap-plan
+          path: terraform
+
+      - name: Terraform Bootstrap Apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -input=false tfplan-bootstrap
+
+  platform-plan:
+    name: Terraform Platform Plan
+    needs: bootstrap-apply
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Get EKS connection details
+        id: eks
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "cluster_endpoint=$(terraform output -raw cluster_endpoint)" >> "$GITHUB_OUTPUT"
+          echo "cluster_name=$(terraform output -raw cluster_name)" >> "$GITHUB_OUTPUT"
+
+          terraform output -raw cluster_certificate_authority_data > /tmp/cluster-ca.txt
+
+      - name: Terraform Platform Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          KUBERNETES_HOST: ${{ steps.eks.outputs.cluster_endpoint }}
+          KUBERNETES_CLUSTER_NAME: ${{ steps.eks.outputs.cluster_name }}
+        run: |
+          KUBERNETES_CA_CERTIFICATE="$(cat /tmp/cluster-ca.txt)"
+
+          terraform plan \
+            -input=false \
+            -var="terraform_bootstrap=false" \
+            -var="kubernetes_host=${KUBERNETES_HOST}" \
+            -var="kubernetes_ca_certificate=${KUBERNETES_CA_CERTIFICATE}" \
+            -var="kubernetes_cluster_name=${KUBERNETES_CLUSTER_NAME}" \
+            -out=tfplan-platform
+
+      - name: Upload Terraform Platform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-platform-plan
+          path: terraform/tfplan-platform
+          if-no-files-found: error
+
+  platform-apply:
+    name: Terraform Platform Apply
+    needs: platform-plan
+    runs-on: ubuntu-latest
+
+    environment:
+      name: terraform-production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Download Terraform Platform Plan
+        uses: actions/download-artifact@v5
+        with:
+          name: terraform-platform-plan
+          path: terraform
+
+      - name: Terraform Platform Apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -input=false tfplan-platform
