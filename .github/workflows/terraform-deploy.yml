@@ -15,10 +15,41 @@ permissions:
 env:
   AWS_REGION: eu-west-2
   TF_WORKING_DIR: terraform
+
+  TF_VAR_availability_zones: ${{ vars.TF_AVAILABILITY_ZONES }}
+  TF_VAR_aws_load_balancer_controller_policy_name: ${{ vars.TF_AWS_LB_CONTROLLER_POLICY_NAME }}
+  TF_VAR_aws_load_balancer_controller_role_name: ${{ vars.TF_AWS_LB_CONTROLLER_ROLE_NAME }}
+  TF_VAR_argocd_chart_version: ${{ vars.TF_ARGOCD_CHART_VERSION }}
+  TF_VAR_cert_manager_policy_name: ${{ vars.TF_CERT_MANAGER_POLICY_NAME }}
+  TF_VAR_cert_manager_role_name: ${{ vars.TF_CERT_MANAGER_ROLE_NAME }}
+  TF_VAR_cluster_version: ${{ vars.TF_CLUSTER_VERSION }}
+  TF_VAR_ebs_csi_driver_role_name: ${{ vars.TF_EBS_CSI_DRIVER_ROLE_NAME }}
+  TF_VAR_eks_cluster_role_name: ${{ vars.TF_EKS_CLUSTER_ROLE_NAME }}
+  TF_VAR_environment: ${{ vars.TF_ENVIRONMENT }}
+  TF_VAR_event_producer_policy_name: ${{ vars.TF_EVENT_PRODUCER_POLICY_NAME }}
+  TF_VAR_event_producer_role_name: ${{ vars.TF_EVENT_PRODUCER_ROLE_NAME }}
+  TF_VAR_event_worker_policy_name: ${{ vars.TF_EVENT_WORKER_POLICY_NAME }}
+  TF_VAR_event_worker_role_name: ${{ vars.TF_EVENT_WORKER_ROLE_NAME }}
+  TF_VAR_external_dns_policy_name: ${{ vars.TF_EXTERNAL_DNS_POLICY_NAME }}
+  TF_VAR_external_dns_role_name: ${{ vars.TF_EXTERNAL_DNS_ROLE_NAME }}
   TF_VAR_github_actions_oidc_role_name: ${{ vars.TF_GITHUB_ACTIONS_OIDC_ROLE_NAME }}
   TF_VAR_github_actions_terraform_role_arn: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+  TF_VAR_karpenter_chart_version: ${{ vars.TF_KARPENTER_CHART_VERSION }}
   TF_VAR_local_deployment_principal_arn: ${{ vars.TF_LOCAL_DEPLOYMENT_PRINCIPAL_ARN }}
-  TF_VAR_argocd_chart_version: ${{ vars.TF_ARGOCD_CHART_VERSION }}
+  TF_VAR_namespace: ${{ vars.TF_NAMESPACE }}
+  TF_VAR_node_group_role_name: ${{ vars.TF_NODE_GROUP_ROLE_NAME }}
+  TF_VAR_owner: ${{ vars.TF_OWNER }}
+  TF_VAR_postgres_db: ${{ vars.TF_POSTGRES_DB }}
+  TF_VAR_postgres_user: ${{ vars.TF_POSTGRES_USER }}
+  TF_VAR_private_subnets: ${{ vars.TF_PRIVATE_SUBNETS }}
+  TF_VAR_project_name: ${{ vars.TF_PROJECT_NAME }}
+  TF_VAR_public_subnets: ${{ vars.TF_PUBLIC_SUBNETS }}
+  TF_VAR_route53_zone_id: ${{ vars.TF_ROUTE53_ZONE_ID }}
+  TF_VAR_vpc_cidr: ${{ vars.TF_VPC_CIDR }}
+  TF_VAR_vpc_name: ${{ vars.TF_VPC_NAME }}
+
+  TF_VAR_postgres_password: ${{ secrets.TF_POSTGRES_PASSWORD }}
+  TF_VAR_grafana_password: ${{ secrets.TF_GRAFANA_PASSWORD }}
 
 concurrency:
   group: terraform-stable-v1.31
@@ -68,6 +99,7 @@ jobs:
         with:
           name: terraform-bootstrap-plan
           path: terraform/tfplan-bootstrap
+          retention-days: 1
           if-no-files-found: error
 
   bootstrap-apply:
@@ -157,6 +189,7 @@ jobs:
         with:
           name: terraform-platform-plan
           path: terraform/tfplan-platform
+          retention-days: 1
           if-no-files-found: error
 
   platform-apply:
