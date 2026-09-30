@@ -247,6 +247,7 @@ data "aws_iam_policy_document" "github_actions_terraform" {
     actions = [
       "iam:GetOpenIDConnectProvider",
       "iam:CreateRole",
+      "iam:ListOpenIDConnectProviders",
       "iam:DeleteRole",
       "iam:GetRole",
       "iam:UpdateRole",
