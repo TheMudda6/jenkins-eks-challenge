@@ -265,9 +265,6 @@ data "aws_iam_policy_document" "github_actions_terraform" {
       "iam:TagPolicy",
       "iam:UntagPolicy",
 
-      "iam:AttachRolePolicy",
-      "iam:DetachRolePolicy",
-      "iam:ListAttachedRolePolicies",
       "iam:ListRolePolicies",
 
       "iam:PutRolePolicy",
@@ -280,6 +277,41 @@ data "aws_iam_policy_document" "github_actions_terraform" {
       "arn:aws:iam::893061519920:role/github-actions-oidc-role",
       "arn:aws:iam::893061519920:policy/jenkins-*",
       "arn:aws:iam::893061519920:policy/github-actions-ecr-policy"
+    ]
+  }
+
+  statement {
+    sid    = "ManageIamRolePolicyAttachments"
+    effect = "Allow"
+
+    actions = [
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+      "iam:ListAttachedRolePolicies"
+    ]
+
+    resources = [
+      "arn:aws:iam::893061519920:role/jenkins-*",
+      "arn:aws:iam::893061519920:role/github-actions-oidc-role"
+    ]
+  }
+
+  statement {
+    sid    = "ManageKarpenterInstanceProfiles"
+    effect = "Allow"
+
+    actions = [
+      "iam:CreateInstanceProfile",
+      "iam:DeleteInstanceProfile",
+      "iam:GetInstanceProfile",
+      "iam:ListInstanceProfiles",
+      "iam:AddRoleToInstanceProfile",
+      "iam:RemoveRoleFromInstanceProfile",
+      "iam:TagInstanceProfile"
+    ]
+
+    resources = [
+      "arn:aws:iam::893061519920:instance-profile/jenkins-*"
     ]
   }
 
@@ -327,7 +359,9 @@ data "aws_iam_policy_document" "github_actions_terraform" {
     effect = "Allow"
 
     actions = [
-      "iam:CreateOpenIDConnectProvider"
+      "iam:CreateOpenIDConnectProvider",
+      "iam:GetOpenIDConnectProvider",
+      "iam:DeleteOpenIDConnectProvider"
     ]
 
     resources = [
