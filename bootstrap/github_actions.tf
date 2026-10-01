@@ -197,6 +197,7 @@ data "aws_iam_policy_document" "github_actions_terraform" {
     actions = [
       "ec2:CreateVpc",
       "ec2:DescribeVpcs",
+      "ec2:DescribeVpcAttribute",
       "ec2:ModifyVpcAttribute",
       "ec2:DeleteVpc",
 
@@ -222,6 +223,7 @@ data "aws_iam_policy_document" "github_actions_terraform" {
 
       "ec2:AllocateAddress",
       "ec2:DescribeAddresses",
+      "ec2:DescribeAddressesAttribute",
       "ec2:AssociateAddress",
       "ec2:DisassociateAddress",
       "ec2:ReleaseAddress",
@@ -245,9 +247,7 @@ data "aws_iam_policy_document" "github_actions_terraform" {
     effect = "Allow"
 
     actions = [
-      "iam:GetOpenIDConnectProvider",
       "iam:CreateRole",
-      "iam:ListOpenIDConnectProviders",
       "iam:DeleteRole",
       "iam:GetRole",
       "iam:UpdateRole",
@@ -280,6 +280,32 @@ data "aws_iam_policy_document" "github_actions_terraform" {
       "arn:aws:iam::893061519920:role/github-actions-oidc-role",
       "arn:aws:iam::893061519920:policy/jenkins-*",
       "arn:aws:iam::893061519920:policy/github-actions-ecr-policy"
+    ]
+  }
+
+  statement {
+    sid    = "ListIamOpenIDConnectProviders"
+    effect = "Allow"
+
+    actions = [
+      "iam:ListOpenIDConnectProviders"
+    ]
+
+    resources = [
+      "*"
+    ]
+  }
+
+  statement {
+    sid    = "ReadIamOpenIDConnectProvider"
+    effect = "Allow"
+
+    actions = [
+      "iam:GetOpenIDConnectProvider"
+    ]
+
+    resources = [
+      "arn:aws:iam::893061519920:oidc-provider/token.actions.githubusercontent.com"
     ]
   }
 
@@ -341,7 +367,8 @@ data "aws_iam_policy_document" "github_actions_terraform" {
     ]
 
     resources = [
-      "arn:aws:secretsmanager:eu-west-2:893061519920:secret:jenkins-*"
+      "arn:aws:secretsmanager:eu-west-2:893061519920:secret:jenkins/postgres-*",
+      "arn:aws:secretsmanager:eu-west-2:893061519920:secret:jenkins/grafana-*"
     ]
   }
 }
