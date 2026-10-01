@@ -284,6 +284,19 @@ data "aws_iam_policy_document" "github_actions_terraform" {
   }
 
   statement {
+    sid    = "ReadEksNodegroupServiceLinkedRole"
+    effect = "Allow"
+
+    actions = [
+      "iam:GetRole"
+    ]
+
+    resources = [
+      "arn:aws:iam::893061519920:role/aws-service-role/eks-nodegroup.amazonaws.com/AWSServiceRoleForAmazonEKSNodegroup"
+    ]
+  }
+
+  statement {
     sid    = "ListIamOpenIDConnectProviders"
     effect = "Allow"
 
@@ -306,6 +319,19 @@ data "aws_iam_policy_document" "github_actions_terraform" {
 
     resources = [
       "arn:aws:iam::893061519920:oidc-provider/token.actions.githubusercontent.com"
+    ]
+  }
+
+  statement {
+    sid    = "ManageEksOpenIDConnectProvider"
+    effect = "Allow"
+
+    actions = [
+      "iam:CreateOpenIDConnectProvider"
+    ]
+
+    resources = [
+      "arn:aws:iam::893061519920:oidc-provider/oidc.eks.eu-west-2.amazonaws.com/id/*"
     ]
   }
 
@@ -357,6 +383,7 @@ data "aws_iam_policy_document" "github_actions_terraform" {
       "secretsmanager:CreateSecret",
       "secretsmanager:DeleteSecret",
       "secretsmanager:DescribeSecret",
+      "secretsmanager:GetResourcePolicy",
       "secretsmanager:GetSecretValue",
       "secretsmanager:PutSecretValue",
       "secretsmanager:UpdateSecret",
