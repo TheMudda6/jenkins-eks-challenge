@@ -19,3 +19,8 @@ variable "grafana_password" {
   type        = string
   sensitive   = true
 }
+
+variable "kms_key_arn" {
+  description = "ARN of the customer-managed KMS key used to encrypt Secrets Manager secrets."
+  type        = string
+}

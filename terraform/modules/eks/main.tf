@@ -21,6 +21,16 @@ resource "aws_eks_cluster" "main" {
     "scheduler",
   ]
 
+  encryption_config {
+    provider {
+      key_arn = var.secrets_kms_key_arn
+    }
+
+    resources = [
+      "secrets",
+    ]
+  }
+
   access_config {
     authentication_mode = "API_AND_CONFIG_MAP"
   }

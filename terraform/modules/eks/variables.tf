@@ -46,6 +46,11 @@ variable "cluster_role_arn" {
   type        = string
 }
 
+variable "secrets_kms_key_arn" {
+  description = "ARN of the customer-managed KMS key used to encrypt EKS Kubernetes secrets."
+  type        = string
+}
+
 variable "node_role_arn" {
   description = "The ARN of the IAM role that EKS worker nodes will use."
   type        = string

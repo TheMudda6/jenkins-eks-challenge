@@ -13,6 +13,7 @@ resource "aws_sqs_queue" "orders_dlq" {
   name = "${var.project_name}-${var.environment}-orders-dlq"
 
   message_retention_seconds = 1209600
+  kms_master_key_id         = var.kms_key_arn
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-orders-dlq"
@@ -28,6 +29,8 @@ resource "aws_sqs_queue" "orders" {
   visibility_timeout_seconds = 30
 
   message_retention_seconds = 345600
+
+  kms_master_key_id         = var.kms_key_arn
 
   receive_wait_time_seconds = 20
 

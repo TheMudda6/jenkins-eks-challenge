@@ -33,6 +33,20 @@ module "vpc" {
 }
 
 # -----------------------------------------------------------------------------
+# KMS Module
+#
+# Purpose:
+# Creates customer-managed encryption keys used by platform resources.
+# -----------------------------------------------------------------------------
+
+module "kms" {
+  source = "./modules/kms"
+
+  project_name = var.project_name
+  environment  = var.environment
+}
+
+# -----------------------------------------------------------------------------
 # IAM Module
 #
 # Purpose:
@@ -111,6 +125,7 @@ module "eks" {
   subnet_ids = module.vpc.private_subnets
 
   cluster_role_arn               = module.iam.eks_cluster_role_arn
+  secrets_kms_key_arn            = module.kms.secrets_key_arn
   node_role_arn                  = module.iam.node_group_role_arn
   local_deployment_principal_arn = var.local_deployment_principal_arn
 
@@ -162,6 +177,7 @@ module "sqs" {
 
   project_name = var.project_name
   environment  = var.environment
+  kms_key_arn  = module.kms.sqs_key_arn
 
 }
 
@@ -185,6 +201,7 @@ module "ecr" {
 
   project_name = var.project_name
   environment  = var.environment
+  kms_key_arn  = module.kms.ecr_key_arn
 }
 
 output "repository_urls" {
@@ -222,6 +239,8 @@ module "secrets" {
 
   postgres_password = var.postgres_password
   grafana_password  = var.grafana_password
+
+  kms_key_arn = module.kms.secrets_key_arn
 }
 
 # -----------------------------------------------------------------------------

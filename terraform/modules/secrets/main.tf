@@ -20,10 +20,11 @@ resource "aws_secretsmanager_secret" "postgres" {
   }
 }
 
-
 resource "aws_secretsmanager_secret_version" "postgres" {
 
   secret_id = aws_secretsmanager_secret.postgres.id
+
+  kms_key_id = var.kms_key_arn
 
   secret_string = jsonencode({
     POSTGRES_DB       = "orders"
@@ -35,6 +36,8 @@ resource "aws_secretsmanager_secret_version" "postgres" {
 resource "aws_secretsmanager_secret" "grafana" {
   name                    = "jenkins/grafana"
   recovery_window_in_days = 0
+
+  kms_key_id = var.kms_key_arn
 
   tags = {
     Name        = "grafana-secret"

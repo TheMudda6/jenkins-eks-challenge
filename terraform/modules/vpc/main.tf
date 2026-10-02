@@ -30,6 +30,98 @@ resource "aws_vpc" "main" {
 }
 
 # -----------------------------------------------------------------------------
+# Default VPC Security Group
+#
+# Purpose:
+# Removes the default inbound and outbound rules from the VPC's default
+# security group so that resources cannot unintentionally inherit permissive
+# network access.
+#
+# Application and Kubernetes traffic must use explicitly defined security
+# groups instead.
+# -----------------------------------------------------------------------------
+
+resource "aws_default_security_group" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = merge(local.common_tags, {
+    Name = "${var.vpc_name}-default-sg"
+  })
+}
+
+# -----------------------------------------------------------------------------
+# VPC Flow Logs CloudWatch Log Group
+#
+# Purpose:
+# Stores VPC Flow Log records in CloudWatch Logs for network visibility,
+# troubleshooting, and security auditing.
+# -----------------------------------------------------------------------------
+
+resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
+  name              = "/aws/vpc/${var.vpc_name}/flow-logs"
+  retention_in_days = 30
+
+  tags = merge(local.common_tags, {
+    Name = "${var.vpc_name}-vpc-flow-logs"
+  })
+}
+
+# -----------------------------------------------------------------------------
+# VPC Flow Logs IAM Role
+#
+# Purpose:
+# Allows the VPC Flow Logs service to publish flow-log records to the
+# CloudWatch Log Group created above.
+# -----------------------------------------------------------------------------
+
+resource "aws_iam_role" "vpc_flow_logs" {
+  name = "${var.vpc_name}-vpc-flow-logs-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "vpc_flow_logs" {
+  role       = aws_iam_role.vpc_flow_logs.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonVPCFlowLogsDeliveryRolePolicy"
+}
+
+# -----------------------------------------------------------------------------
+# VPC Flow Logs
+#
+# Purpose:
+# Captures all accepted and rejected network traffic for the VPC and delivers
+# the records to the dedicated CloudWatch Log Group.
+# -----------------------------------------------------------------------------
+
+resource "aws_flow_log" "main" {
+  iam_role_arn         = aws_iam_role.vpc_flow_logs.arn
+  log_destination      = aws_cloudwatch_log_group.vpc_flow_logs.arn
+  log_destination_type = "cloud-watch-logs"
+
+  traffic_type = "ALL"
+  vpc_id       = aws_vpc.main.id
+
+  max_aggregation_interval = 60
+
+  depends_on = [
+    aws_iam_role_policy_attachment.vpc_flow_logs
+  ]
+}
+
+# -----------------------------------------------------------------------------
 # Private Subnets
 #
 # Purpose:
