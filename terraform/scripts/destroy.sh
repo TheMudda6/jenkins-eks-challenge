@@ -242,7 +242,7 @@ TRAEFIK_NLB_ARN=""
 TRAEFIK_CANDIDATES="$(
   aws elbv2 describe-load-balancers \
     --region "$AWS_REGION" \
-    --query 'LoadBalancers[?contains(LoadBalancerName, `traefik`)].{Arn:LoadBalancerArn,VpcId:VpcId}' \
+    --query "LoadBalancers[?contains(LoadBalancerName, \`traefik\`)].{Arn:LoadBalancerArn,VpcId:VpcId}" \
     --output text
 )"
 
@@ -399,7 +399,7 @@ print_banner "Cleaning Up ExternalDNS Records"
 ROUTE53_ZONE_ID="$(
   aws route53 list-hosted-zones-by-name \
     --dns-name "jenkins.mud-as-sir.uk." \
-    --query 'HostedZones[?Name==`jenkins.mud-as-sir.uk.` && Config.PrivateZone==`false`].Id | [0]' \
+    --query "HostedZones[?Name==\`jenkins.mud-as-sir.uk.\` && Config.PrivateZone==\`false\`].Id | [0]" \
     --output text
 )"
 
@@ -724,7 +724,7 @@ echo
 echo "Preserved project ECR repositories:"
 aws ecr describe-repositories \
   --region "$AWS_REGION" \
-  --query 'repositories[?starts_with(repositoryName, `jenkins-eks-challenge-dev-`)].repositoryName' \
+  --query "repositories[?starts_with(repositoryName, \`jenkins-eks-challenge-dev-\`)].repositoryName" \
   --output text
 
 echo
