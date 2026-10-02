@@ -13,6 +13,14 @@ resource "aws_eks_cluster" "main" {
   role_arn = var.cluster_role_arn
   version  = var.cluster_version
 
+  enabled_cluster_log_types = [
+    "api",
+    "audit",
+    "authenticator",
+    "controllerManager",
+    "scheduler",
+  ]
+
   access_config {
     authentication_mode = "API_AND_CONFIG_MAP"
   }
