@@ -10,19 +10,6 @@
 # AWS Configuration
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# AWS Region
-#
-# Purpose:
-# Defines the AWS region where all infrastructure will be deployed.
-# -----------------------------------------------------------------------------
-
-variable "aws_region" {
-  description = "AWS region to deploy resources into."
-  type        = string
-  default     = "eu-west-2"
-}
-
 # =============================================================================
 # Project Configuration
 # =============================================================================
@@ -257,16 +244,6 @@ variable "max_size" {
 # Configuration used to create the PostgreSQL Kubernetes Secret.
 # --------------------------------------------------------------------
 
-variable "postgres_db" {
-  description = "PostgreSQL database name."
-  type        = string
-}
-
-variable "postgres_user" {
-  description = "PostgreSQL username."
-  type        = string
-}
-
 variable "postgres_password" {
   description = "PostgreSQL password."
   type        = string
@@ -277,11 +254,6 @@ variable "grafana_password" {
   description = "Grafana administrator password."
   type        = string
   sensitive   = true
-}
-
-variable "namespace" {
-  description = "Kubernetes namespace for application workloads."
-  type        = string
 }
 
 variable "event_producer_role_name" {
