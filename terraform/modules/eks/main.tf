@@ -14,9 +14,6 @@
 # CKV_AWS_39: Public endpoint should be disabled.
 # -----------------------------------------------------------------------------
 
-#checkov:skip=CKV_AWS_38:GitHub-hosted Actions runners require external EKS API access.
-#checkov:skip=CKV_AWS_39:GitHub-hosted Actions runners require external EKS API access.
-
 # -----------------------------------------------------------------------------
 # Amazon EKS Cluster
 #
@@ -27,6 +24,8 @@
 # while worker nodes run the application workloads.
 # -----------------------------------------------------------------------------
 
+#checkov:skip=CKV_AWS_38:GitHub-hosted Actions runners require external EKS API access.
+#checkov:skip=CKV_AWS_39:GitHub-hosted Actions runners require external EKS API access.
 resource "aws_eks_cluster" "main" {
   name     = var.cluster_name
   role_arn = var.cluster_role_arn
