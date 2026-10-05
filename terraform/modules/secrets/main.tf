@@ -13,6 +13,8 @@ resource "aws_secretsmanager_secret" "postgres" {
 
   recovery_window_in_days = 0
 
+  kms_key_id = var.kms_key_arn
+
   tags = {
     Name        = "postgres-secret"
     Project     = "jenkins-eks"
@@ -23,8 +25,6 @@ resource "aws_secretsmanager_secret" "postgres" {
 resource "aws_secretsmanager_secret_version" "postgres" {
 
   secret_id = aws_secretsmanager_secret.postgres.id
-
-  kms_key_id = var.kms_key_arn
 
   secret_string = jsonencode({
     POSTGRES_DB       = "orders"
