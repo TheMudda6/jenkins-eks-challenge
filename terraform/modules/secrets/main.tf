@@ -16,8 +16,11 @@
 # workloads consuming the credential. That rotation workflow is not currently
 # implemented in this project.
 #
-#checkov:skip=CKV2_AWS_57:PostgreSQL credential rotation requires coordinated database and workload rotation, which is not implemented.
+
 resource "aws_secretsmanager_secret" "postgres" {
+
+  #checkov:skip=CKV2_AWS_57:PostgreSQL credential rotation requires coordinated database and workload rotation, which is not implemented.
+
   name = "jenkins/postgres"
 
   recovery_window_in_days = 0
@@ -49,8 +52,11 @@ resource "aws_secretsmanager_secret_version" "postgres" {
 # credential refresh handling for the Grafana workload, which is not
 # currently implemented in this project.
 #
-#checkov:skip=CKV2_AWS_57:Grafana credential rotation requires coordinated workload refresh, which is not implemented.
+
 resource "aws_secretsmanager_secret" "grafana" {
+
+  #checkov:skip=CKV2_AWS_57:Grafana credential rotation requires coordinated workload refresh, which is not implemented.
+
   name                    = "jenkins/grafana"
   recovery_window_in_days = 0
 
