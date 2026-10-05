@@ -1,4 +1,23 @@
 # -----------------------------------------------------------------------------
+# Checkov Exception: EKS Public API Endpoint
+#
+# Purpose:
+# GitHub-hosted Actions runners require public access to the EKS Kubernetes
+# API endpoint because the CI/CD platform plan and apply jobs run outside the
+# AWS VPC.
+#
+# The endpoint cannot be restricted to a static CIDR because GitHub-hosted
+# runner IP addresses are dynamic. Moving the endpoint to private-only access
+# would require a self-hosted runner with private VPC connectivity.
+#
+# CKV_AWS_38: Public endpoint must not allow 0.0.0.0/0.
+# CKV_AWS_39: Public endpoint should be disabled.
+# -----------------------------------------------------------------------------
+
+#checkov:skip=CKV_AWS_38:GitHub-hosted Actions runners require external EKS API access.
+#checkov:skip=CKV_AWS_39:GitHub-hosted Actions runners require external EKS API access.
+
+# -----------------------------------------------------------------------------
 # Amazon EKS Cluster
 #
 # Purpose:

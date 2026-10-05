@@ -80,6 +80,66 @@ resource "aws_kms_key" "route53_dnssec" {
 }
 
 # -----------------------------------------------------------------------------
+# Route 53 Query Logs KMS Key
+#
+# Purpose:
+# Creates the customer-managed KMS key used to encrypt the CloudWatch Log
+# Group that receives Route 53 query logs.
+#
+# AWS Requirement:
+# Route 53 query logging uses CloudWatch Logs in us-east-1, so this key must
+# also be created in us-east-1.
+# -----------------------------------------------------------------------------
+
+resource "aws_kms_key" "route53_query_logs" {
+  provider = aws.us-east-1
+
+  description             = "Route 53 query logs encryption key for ${var.jenkins_zone_name}"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudWatchLogs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.us-east-1.amazonaws.com"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:GenerateDataKey*",
+          "kms:ReEncrypt*"
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:us-east-1:${data.aws_caller_identity.current.account_id}:log-group:/aws/route53/${var.jenkins_zone_name}"
+          }
+        }
+      },
+      {
+        Sid    = "EnableIAMUserPermissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "route53-${var.environment}-query-logs"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Route 53 Key Signing Key
 #
 # Purpose:
@@ -124,7 +184,8 @@ resource "aws_cloudwatch_log_group" "route53_query_logs" {
   provider = aws.us-east-1
 
   name              = "/aws/route53/${var.jenkins_zone_name}"
-  retention_in_days = 30
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.route53_query_logs.arn
 
   tags = {
     Name        = "route53-${var.environment}-query-logs"

@@ -62,31 +62,223 @@ resource "aws_iam_role" "controller" {
 # configure and terminate EC2 capacity.
 # -----------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# EC2 launch resource access
+#
+# Karpenter may read the EC2 resources required to launch capacity.
+# These permissions follow Karpenter 1.6.5's scoped CreateFleet/RunInstances
+# model rather than granting EC2 launch access across arbitrary resources.
+# ---------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "controller" {
+  # ---------------------------------------------------------------------------
+  # EC2 launch resource access
+  #
+  # Scope RunInstances/CreateFleet to the EC2 resources Karpenter may use
+  # when launching capacity.
+  # ---------------------------------------------------------------------------
+
   statement {
     effect = "Allow"
 
     actions = [
+      "ec2:RunInstances",
+      "ec2:CreateFleet"
+    ]
+
+    resources = [
+      "arn:aws:ec2:${data.aws_region.current.name}::image/*",
+      "arn:aws:ec2:${data.aws_region.current.name}::snapshot/*",
+      "arn:aws:ec2:${data.aws_region.current.name}:*:security-group/*",
+      "arn:aws:ec2:${data.aws_region.current.name}:*:subnet/*",
+      "arn:aws:ec2:${data.aws_region.current.name}:*:capacity-reservation/*",
+      "arn:aws:ec2:${data.aws_region.current.name}:*:placement-group/*"
+    ]
+  }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "ec2:RunInstances",
+      "ec2:CreateFleet"
+    ]
+
+    resources = [
+      "arn:aws:ec2:${data.aws_region.current.name}:*:launch-template/*"
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/kubernetes.io/cluster/${var.cluster_name}"
+
+      values = [
+        "owned"
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "aws:ResourceTag/karpenter.sh/nodepool"
+
+      values = [
+        "*"
+      ]
+    }
+  }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "ec2:RunInstances",
       "ec2:CreateFleet",
-      "ec2:CreateLaunchTemplate",
+      "ec2:CreateLaunchTemplate"
+    ]
+
+    resources = [
+      "arn:aws:ec2:${data.aws_region.current.name}:*:fleet/*",
+      "arn:aws:ec2:${data.aws_region.current.name}:*:instance/*",
+      "arn:aws:ec2:${data.aws_region.current.name}:*:volume/*",
+      "arn:aws:ec2:${data.aws_region.current.name}:*:network-interface/*",
+      "arn:aws:ec2:${data.aws_region.current.name}:*:launch-template/*",
+      "arn:aws:ec2:${data.aws_region.current.name}:*:spot-instances-request/*"
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/kubernetes.io/cluster/${var.cluster_name}"
+
+      values = [
+        "owned"
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/eks:eks-cluster-name"
+
+      values = [
+        var.cluster_name
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "aws:RequestTag/karpenter.sh/nodepool"
+
+      values = [
+        "*"
+      ]
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # EC2 launch-template lifecycle
+  # ---------------------------------------------------------------------------
+
+  statement {
+    effect = "Allow"
+
+    actions = [
       "ec2:CreateTags",
-      "ec2:DeleteLaunchTemplate",
+      "ec2:DeleteLaunchTemplate"
+    ]
+
+    resources = [
+      "arn:aws:ec2:${data.aws_region.current.name}:*:launch-template/*"
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/kubernetes.io/cluster/${var.cluster_name}"
+
+      values = [
+        "owned"
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "aws:ResourceTag/karpenter.sh/nodepool"
+
+      values = [
+        "*"
+      ]
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # EC2 instance lifecycle
+  # ---------------------------------------------------------------------------
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "ec2:TerminateInstances"
+    ]
+
+    resources = [
+      "arn:aws:ec2:${data.aws_region.current.name}:*:instance/*"
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/kubernetes.io/cluster/${var.cluster_name}"
+
+      values = [
+        "owned"
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "aws:ResourceTag/karpenter.sh/nodepool"
+
+      values = [
+        "*"
+      ]
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # Regional EC2 resource discovery
+  # ---------------------------------------------------------------------------
+
+  statement {
+    effect = "Allow"
+
+    actions = [
       "ec2:DescribeAvailabilityZones",
+      "ec2:DescribeCapacityReservations",
       "ec2:DescribeImages",
+      "ec2:DescribeInstanceStatus",
       "ec2:DescribeInstanceTypeOfferings",
       "ec2:DescribeInstanceTypes",
       "ec2:DescribeInstances",
       "ec2:DescribeLaunchTemplates",
+      "ec2:DescribePlacementGroups",
       "ec2:DescribeSecurityGroups",
       "ec2:DescribeSpotPriceHistory",
-      "ec2:DescribeSubnets",
-      "ec2:DescribeVolumes",
-      "ec2:RunInstances",
-      "ec2:TerminateInstances"
+      "ec2:DescribeSubnets"
     ]
 
     resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+
+      values = [
+        data.aws_region.current.name
+      ]
+    }
   }
+
+  # ---------------------------------------------------------------------------
+  # SSM parameter discovery
+  # ---------------------------------------------------------------------------
 
   statement {
     effect = "Allow"
@@ -100,6 +292,10 @@ data "aws_iam_policy_document" "controller" {
     ]
   }
 
+  # ---------------------------------------------------------------------------
+  # Pricing discovery
+  # ---------------------------------------------------------------------------
+
   statement {
     effect = "Allow"
 
@@ -109,6 +305,10 @@ data "aws_iam_policy_document" "controller" {
 
     resources = ["*"]
   }
+
+  # ---------------------------------------------------------------------------
+  # Node IAM role passing
+  # ---------------------------------------------------------------------------
 
   statement {
     effect = "Allow"
@@ -120,7 +320,21 @@ data "aws_iam_policy_document" "controller" {
     resources = [
       aws_iam_role.node.arn
     ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+
+      values = [
+        "ec2.amazonaws.com",
+        "ec2.amazonaws.com.cn"
+      ]
+    }
   }
+
+  # ---------------------------------------------------------------------------
+  # EKS cluster discovery
+  # ---------------------------------------------------------------------------
 
   statement {
     effect = "Allow"
@@ -130,7 +344,199 @@ data "aws_iam_policy_document" "controller" {
     ]
 
     resources = [
-      "arn:aws:eks:*:*:cluster/${var.cluster_name}"
+      "arn:aws:eks:${data.aws_region.current.name}:*:cluster/${var.cluster_name}"
+    ]
+  }
+
+  # ---------------------------------------------------------------------------
+  # Instance profile creation
+  # ---------------------------------------------------------------------------
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "iam:CreateInstanceProfile"
+    ]
+
+    resources = [
+      "arn:aws:iam::*:instance-profile/*"
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/kubernetes.io/cluster/${var.cluster_name}"
+
+      values = [
+        "owned"
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/eks:eks-cluster-name"
+
+      values = [
+        var.cluster_name
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/topology.kubernetes.io/region"
+
+      values = [
+        data.aws_region.current.name
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass"
+
+      values = [
+        "*"
+      ]
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # Instance profile tagging
+  # ---------------------------------------------------------------------------
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "iam:TagInstanceProfile"
+    ]
+
+    resources = [
+      "arn:aws:iam::*:instance-profile/*"
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/kubernetes.io/cluster/${var.cluster_name}"
+
+      values = [
+        "owned"
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/topology.kubernetes.io/region"
+
+      values = [
+        data.aws_region.current.name
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/kubernetes.io/cluster/${var.cluster_name}"
+
+      values = [
+        "owned"
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/eks:eks-cluster-name"
+
+      values = [
+        var.cluster_name
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/topology.kubernetes.io/region"
+
+      values = [
+        data.aws_region.current.name
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass"
+
+      values = [
+        "*"
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass"
+
+      values = [
+        "*"
+      ]
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # Instance profile lifecycle
+  # ---------------------------------------------------------------------------
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "iam:AddRoleToInstanceProfile",
+      "iam:RemoveRoleFromInstanceProfile",
+      "iam:DeleteInstanceProfile"
+    ]
+
+    resources = [
+      "arn:aws:iam::*:instance-profile/*"
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/kubernetes.io/cluster/${var.cluster_name}"
+
+      values = [
+        "owned"
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/topology.kubernetes.io/region"
+
+      values = [
+        data.aws_region.current.name
+      ]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass"
+
+      values = [
+        "*"
+      ]
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # Instance profile discovery
+  # ---------------------------------------------------------------------------
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "iam:GetInstanceProfile"
+    ]
+
+    resources = [
+      "arn:aws:iam::*:instance-profile/*"
     ]
   }
 
@@ -138,13 +544,7 @@ data "aws_iam_policy_document" "controller" {
     effect = "Allow"
 
     actions = [
-      "iam:CreateInstanceProfile",
-      "iam:DeleteInstanceProfile",
-      "iam:AddRoleToInstanceProfile",
-      "iam:RemoveRoleFromInstanceProfile",
-      "iam:TagInstanceProfile",
-      "iam:ListInstanceProfiles",
-      "iam:GetInstanceProfile"
+      "iam:ListInstanceProfiles"
     ]
 
     resources = ["*"]

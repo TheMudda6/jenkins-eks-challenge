@@ -1,4 +1,13 @@
 # -----------------------------------------------------------------------------
+# AWS Region
+#
+# Purpose:
+# Provides the current AWS region for regional resources and service policies.
+# -----------------------------------------------------------------------------
+
+data "aws_region" "current" {}
+
+# -----------------------------------------------------------------------------
 # Common Resource Tags
 #
 # Purpose:
@@ -50,6 +59,64 @@ resource "aws_default_security_group" "main" {
 }
 
 # -----------------------------------------------------------------------------
+# VPC Flow Logs KMS Key
+#
+# Purpose:
+# Creates the customer-managed KMS key used to encrypt the CloudWatch Log
+# Group that stores VPC Flow Logs.
+#
+# AWS Requirement:
+# CloudWatch Logs KMS keys must be created in the same AWS region as the
+# log group. This module uses the project's default AWS provider region.
+# -----------------------------------------------------------------------------
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_kms_key" "vpc_flow_logs" {
+  description             = "VPC Flow Logs CloudWatch encryption key for ${var.vpc_name}"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudWatchLogs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${data.aws_region.current.name}.amazonaws.com"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:GenerateDataKey*",
+          "kms:ReEncrypt*"
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/vpc/${var.vpc_name}/flow-logs"
+          }
+        }
+      },
+      {
+        Sid    = "EnableIAMUserPermissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${var.vpc_name}-vpc-flow-logs-kms"
+  })
+}
+
+# -----------------------------------------------------------------------------
 # VPC Flow Logs CloudWatch Log Group
 #
 # Purpose:
@@ -59,7 +126,8 @@ resource "aws_default_security_group" "main" {
 
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   name              = "/aws/vpc/${var.vpc_name}/flow-logs"
-  retention_in_days = 30
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.vpc_flow_logs.arn
 
   tags = merge(local.common_tags, {
     Name = "${var.vpc_name}-vpc-flow-logs"
