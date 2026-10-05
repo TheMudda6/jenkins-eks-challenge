@@ -36,7 +36,7 @@ resource "aws_ecr_repository" "services" {
     kms_key         = var.kms_key_arn
   }
 
-  force_delete         = false
+  force_delete = false
 
   lifecycle {
     prevent_destroy = true

@@ -30,7 +30,7 @@ resource "aws_sqs_queue" "orders" {
 
   message_retention_seconds = 345600
 
-  kms_master_key_id         = var.kms_key_arn
+  kms_master_key_id = var.kms_key_arn
 
   receive_wait_time_seconds = 20
 
