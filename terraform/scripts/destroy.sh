@@ -151,6 +151,7 @@ echo
 echo "Deleting ArgoCD child Applications..."
 
 for application in \
+  e-commerce-dev \
   e-commerce-prod \
   postgres \
   redis \
@@ -169,6 +170,7 @@ echo
 echo "Waiting for ArgoCD child Applications to disappear..."
 
 for application in \
+  e-commerce-dev \
   e-commerce-prod \
   postgres \
   redis \
