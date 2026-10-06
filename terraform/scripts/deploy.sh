@@ -265,10 +265,10 @@ ARGOCD_ELAPSED=0
 until kubectl get application platform-root \
   -n argocd \
   -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null \
-  | grep -q " Healthy"; do
+  | grep -q "^Synced Healthy$"; do
 
   if [ "$ARGOCD_ELAPSED" -ge "$ARGOCD_TIMEOUT" ]; then
-    echo "ERROR: platform-root did not become Healthy."
+    echo "ERROR: platform-root did not become Synced and Healthy."
     kubectl get application platform-root -n argocd
     exit 1
   fi
@@ -278,7 +278,7 @@ until kubectl get application platform-root \
   ARGOCD_ELAPSED=$((ARGOCD_ELAPSED + 10))
 done
 
-echo "✓ platform-root is Healthy."
+echo "✓ platform-root is Synced and Healthy."
 
 # ------------------------------------------------------------
 # Verify child Applications
@@ -292,6 +292,7 @@ echo
 echo "Checking required Applications..."
 
 for application in \
+e-commerce-dev \
 e-commerce-prod \
 postgres \
 redis \
