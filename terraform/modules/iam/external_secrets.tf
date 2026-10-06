@@ -22,6 +22,18 @@ data "aws_iam_policy_document" "external_secrets" {
       var.grafana_secret_arn
     ]
   }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "kms:Decrypt"
+    ]
+
+    resources = [
+      var.secrets_kms_key_arn
+    ]
+  }
 }
 
 resource "aws_iam_policy" "external_secrets" {

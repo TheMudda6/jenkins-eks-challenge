@@ -193,3 +193,16 @@ variable "external_dns_policy_name" {
   description = "IAM Policy name for ExternalDNS."
   type        = string
 }
+
+# -----------------------------------------------------------------------------
+# Secrets Manager KMS Key ARN
+#
+# Purpose:
+# Defines the ARN of the customer-managed KMS key used to encrypt
+# AWS Secrets Manager secrets consumed by External Secrets Operator.
+# -----------------------------------------------------------------------------
+
+variable "secrets_kms_key_arn" {
+  description = "ARN of the KMS key used to encrypt Secrets Manager secrets."
+  type        = string
+}

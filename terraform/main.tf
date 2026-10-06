@@ -88,6 +88,8 @@ module "iam" {
 
   grafana_secret_arn = module.secrets.grafana_secret_arn
 
+  secrets_kms_key_arn = module.kms.secrets_key_arn
+
   # ---------------------------------------------------------------------------
   # Route 53 / ExternalDNS / cert-manager
   # ---------------------------------------------------------------------------

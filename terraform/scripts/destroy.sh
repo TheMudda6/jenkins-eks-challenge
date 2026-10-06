@@ -659,6 +659,27 @@ fi
 echo "✓ No project Load Balancers remain."
 
 echo
+echo "Cleaning up EKS CloudWatch log groups:"
+
+REMAINING_LOG_GROUPS="$(
+  aws logs describe-log-groups \
+    --region "$AWS_REGION" \
+    --log-group-name-prefix "/aws/eks/$CLUSTER_NAME" \
+    --query 'logGroups[].logGroupName' \
+    --output text
+)"
+
+if [[ -n "$REMAINING_LOG_GROUPS" && "$REMAINING_LOG_GROUPS" != "None" ]]; then
+  for LOG_GROUP in $REMAINING_LOG_GROUPS; do
+    aws logs delete-log-group \
+      --region "$AWS_REGION" \
+      --log-group-name "$LOG_GROUP"
+  done
+fi
+
+echo "✓ EKS CloudWatch log groups cleaned up."
+
+echo
 echo "Remaining EKS CloudWatch log groups:"
 
 REMAINING_LOG_GROUPS="$(
