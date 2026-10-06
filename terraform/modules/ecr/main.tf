@@ -40,5 +40,12 @@ resource "aws_ecr_repository" "services" {
 
   lifecycle {
     prevent_destroy = true
+
+    # Existing repositories were created with AES256 encryption.
+    # ECR does not support changing repository encryption after creation,
+    # so preserve their existing encryption configuration.
+    ignore_changes = [
+      encryption_configuration,
+    ]
   }
 }

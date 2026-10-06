@@ -161,9 +161,26 @@ resource "aws_iam_role" "vpc_flow_logs" {
   tags = local.common_tags
 }
 
-resource "aws_iam_role_policy_attachment" "vpc_flow_logs" {
-  role       = aws_iam_role.vpc_flow_logs.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonVPCFlowLogsDeliveryRolePolicy"
+resource "aws_iam_role_policy" "vpc_flow_logs" {
+  name = "${var.vpc_name}-vpc-flow-logs-policy"
+  role = aws_iam_role.vpc_flow_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }
 
 # -----------------------------------------------------------------------------
@@ -185,7 +202,7 @@ resource "aws_flow_log" "main" {
   max_aggregation_interval = 60
 
   depends_on = [
-    aws_iam_role_policy_attachment.vpc_flow_logs
+    aws_iam_role_policy.vpc_flow_logs
   ]
 }
 
