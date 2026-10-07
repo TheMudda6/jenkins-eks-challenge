@@ -1,416 +1,1130 @@
-# Jenkins on Amazon EKS
+# Kubernetes E-Commerce Platform on Amazon EKS
 
-A production-inspired Jenkins deployment on Amazon EKS using Terraform, Kubernetes and AWS services with automated deployment, persistent storage, HTTPS and Infrastructure as Code.
+A production-inspired Kubernetes e-commerce platform built on **Amazon EKS**, using Terraform, Kubernetes, Kustomize, ArgoCD, GitHub Actions, AWS managed services, and a full observability stack.
 
-## Table of Contents
+This project evolved from an earlier Jenkins-on-EKS deployment into a complete nine-service Kubernetes platform based on **The K8s Project (v2 Edition) – E-Commerce Platform**.
 
-- [Project Overview](#project-overview)
-- [Objectives](#objectives)
-- [Architecture](#architecture)
-- [Technologies Used](#technologies-used)
-- [Infrastructure Components](#infrastructure-components)
-- [Storage Lifecycle](#storage-lifecycle-jenkins-data-persistence)
-- [Deployment Process](#deployment-process)
-- [Environment Cleanup](#environment-cleanup)
-- [Challenges & Troubleshooting](#challenges--troubleshooting)
-- [Lessons Learned](#lessons-learned)
-- [Future Improvements](#future-improvements)
-- [Repository Structure](#repository-structure)
-- [Deployment](#deployment)
-- [Environment Destruction](#environment-destruction)
-- [Author](#author)
-
+The goal was not simply to deploy an application, but to build, automate, validate, break, troubleshoot, and document a realistic cloud-native platform from infrastructure creation through application delivery and destruction.
 
 ---
 
 ## Project Overview
 
-The goal of this project was to design, build, automate, and understand how Kubernetes, AWS, and Terraform work together to deploy, manage, and destroy a real-world application environment through Infrastructure as Code. The project focused on building a Jenkins platform on Amazon EKS that could be reliably recreated and removed using automated deployment and destruction scripts.
+The platform demonstrates:
 
-Throughout the build process, I gained hands-on experience with Kubernetes networking, persistent storage, IAM Roles for Service Accounts (IRSA), Application Load Balancers, Cloudflare DNS, and HTTPS certificate management using AWS Certificate Manager. The project also provided valuable troubleshooting experience, requiring me to investigate and resolve issues related to storage provisioning, AWS resource cleanup, ingress configuration, and infrastructure dependencies.
+- Infrastructure as Code with Terraform
+- Amazon EKS 1.33
+- Multi-AZ networking
+- Karpenter node provisioning
+- AWS EBS CSI storage
+- Persistent PostgreSQL and Redis
+- AWS Secrets Manager with External Secrets
+- Amazon SQS with a Dead Letter Queue
+- Traefik ingress behind an AWS Network Load Balancer
+- TLS with cert-manager and Let's Encrypt
+- Route53 DNS automation
+- ArgoCD GitOps
+- Kustomize development and production overlays
+- Prometheus and Grafana observability
+- GitHub Actions CI/CD
+- GitHub Actions OIDC authentication
+- Container image security scanning
+- Horizontal Pod Autoscaling
+- Snapshot and restore workflows
+- Automated infrastructure destruction and cleanup
 
-The end result is a small but practical cloud-native platform that demonstrates infrastructure automation, secure application delivery, persistent storage management, and full lifecycle testing from deployment through destruction.
-
----
-
-## Architecture Overview
-
-The following diagram illustrates the complete infrastructure and request flow for the project.
-
-![Architecture Overview](screenshots/architecture-overview.png)
-
-The deployment follows a layered architecture that separates infrastructure provisioning, networking, application routing, and persistent storage. Each layer has a dedicated responsibility, improving security, maintainability, and scalability while reducing manual configuration.
-
-### Cloudflare DNS
-
-The project uses Cloudflare to manage DNS records for the custom domain. The Jenkins subdomain points to the AWS Application Load Balancer using a CNAME record, allowing the application to be accessed through a memorable HTTPS endpoint.
-
-![Cloudflare DNS](screenshots/cloudflare-dns.png)
-
-### Jenkins Dashboard & HTTPS
-
-Once deployed, Jenkins is accessible through the custom domain over HTTPS using an AWS Certificate Manager certificate.
-
-![Jenkins Dashboard](screenshots/jenkins-dashboard-https.png)
+The project was deployed to EKS for live validation and was subsequently destroyed to avoid unnecessary AWS costs.
 
 ---
 
-## Objectives
+# Architecture
 
-This project was designed to:
+```text
+                         Internet
+                            |
+                            v
+                    AWS Network Load Balancer
+                            |
+                            v
+                       Traefik Ingress
+                            |
+                    HTTPS / TLS termination
+                            |
+                            v
+                     api-gateway :8080
+                            |
+          +-----------------+------------------+
+          |                 |                  |
+          v                 v                  v
+   order-service     inventory-service    payment-service
+       :8081              :8082               :8083
+          |
+          +------------------+
+          |                  |
+          v                  v
+ notification-service   shipping-service
+       :8084                 :8085
+          |
+          +------------------+
+          |
+          v
+     worker :8090
+     scheduler :8091
+     dashboard-api :8086
 
-- Learn Infrastructure as Code using Terraform
-- Deploy Kubernetes workloads onto Amazon EKS
-- Configure secure IAM authentication using IRSA
-- Implement persistent storage using Amazon EBS
-- Automate deployments using shell scripts
-- Expose applications securely using an AWS Application Load Balancer
-- Configure HTTPS using AWS Certificate Manager and Cloudflare
-- Validate the complete deployment and destruction lifecycle
-- Create a reusable foundation for future Kubernetes projects
+          |
+          +--------------------+
+          |                    |
+          v                    v
+     PostgreSQL              Redis
+       20Gi                   10Gi
+          |
+          v
+     AWS EBS gp3
+
+order-service / payment-service / shipping-service
+                    |
+                    v
+              Amazon SQS
+                    |
+                    v
+               Worker
+                    |
+                    v
+                DLQ
+
+                    AWS
+                     |
+       +-------------+-------------+
+       |             |             |
+       v             v             v
+  Secrets Manager   ECR          Route53
+       |                           |
+       v                           v
+External Secrets              DNS records
+
+                     |
+                     v
+                  ArgoCD
+                     |
+        +------------+-------------+
+        |            |             |
+        v            v             v
+       Dev          Prod       Platform Apps
+
+                     |
+                     v
+              Prometheus
+                     |
+                     v
+                  Grafana
+```
 
 ---
 
-## Architecture
+# Application Services
 
-The project follows a layered cloud-native architecture that separates infrastructure provisioning, networking, application routing, and persistent storage. Each component has a dedicated responsibility, improving maintainability, security, and scalability while reducing manual configuration.
+The application consists of the nine services defined by the project architecture.
 
-### Request Flow
+| Service | Port | Purpose |
+|---|---:|---|
+| `api-gateway` | 8080 | Entry point for application requests |
+| `order-service` | 8081 | Order processing |
+| `inventory-service` | 8082 | Inventory management |
+| `payment-service` | 8083 | Payment processing |
+| `notification-service` | 8084 | Notifications |
+| `shipping-service` | 8085 | Shipping operations |
+| `worker` | 8090 | Background event processing |
+| `scheduler` | 8091 | Scheduled background processing |
+| `dashboard-api` | 8086 | Dashboard/API functionality |
 
-1. The user enters **https://jenkins.mud-as-sir.uk** into their browser.
-2. Cloudflare resolves the domain name and directs traffic to the AWS Application Load Balancer.
-3. The Application Load Balancer forwards the request to the Kubernetes Ingress.
-4. The Ingress evaluates the routing rules and forwards traffic to the Jenkins Service.
-5. The Service provides a stable internal endpoint and routes traffic to the Jenkins Pod.
-6. The Jenkins Pod serves the application while storing persistent data through a Persistent Volume Claim backed by an Amazon EBS volume.
+Each service is deployed using:
 
----
+- Kubernetes Deployment
+- ClusterIP Service
+- Resource requests and limits
+- Liveness probes
+- Readiness probes
+- Dedicated ServiceAccount
+- Container security settings
+- Multi-stage Docker builds
+- ECR images tagged with the Git commit SHA
 
-## Technologies Used
-
-### Cloud & Infrastructure
-
-- Amazon Web Services (AWS)
-- Terraform
-- Cloudflare
-
-### AWS Services
-
-- Amazon Elastic Kubernetes Service (EKS)
-- Amazon Elastic Compute Cloud (EC2)
-- Amazon Elastic Block Store (EBS)
-- AWS Identity and Access Management (IAM)
-- AWS Certificate Manager (ACM)
-- Amazon CloudWatch
-- AWS Application Load Balancer (ALB)
-
-### Kubernetes Components
-
-- Deployments
-- Pods
-- Services
-- Ingress
-- Namespaces
-- Persistent Volumes (PV)
-- Persistent Volume Claims (PVC)
-- Storage Classes
-
-### Security & Identity
-
-- OpenID Connect (OIDC)
-- IAM Roles for Service Accounts (IRSA)
-- IAM Roles and Policies
-
-### Tooling
-
-- Helm
-- kubectl
-- AWS CLI
-- Git
-- GitHub
-- Bash
-- Visual Studio Code
+Request-path services also use Horizontal Pod Autoscaling.
 
 ---
 
-## Storage Lifecycle (Jenkins Data Persistence)
+# Infrastructure
 
-The following diagram illustrates how Jenkins stores persistent data using Kubernetes Persistent Volumes and Amazon EBS.
+Infrastructure is managed entirely through Terraform.
 
-![Storage Lifecycle](screenshots/storage-lifecycle.png)
+## AWS Infrastructure
 
-Jenkins stores its application data on an Amazon EBS volume rather than inside the container itself. The Jenkins pod mounts a Persistent Volume Claim (PVC), which is dynamically bound to a Persistent Volume (PV) provisioned by the Amazon EBS CSI Driver.
+The platform provisions:
 
-This architecture ensures that application data survives pod restarts, updates, and rescheduling. Even if the Jenkins pod is deleted, Kubernetes automatically mounts the same Persistent Volume Claim to the replacement pod, allowing Jenkins to continue using the existing data without manual intervention.
+- VPC
+- Public and private subnets
+- Multi-AZ networking
+- Internet Gateway
+- NAT Gateway infrastructure
+- VPC Flow Logs
+- Amazon EKS
+- EKS managed components
+- Karpenter
+- IAM roles
+- KMS encryption
+- Amazon ECR
+- Amazon SQS
+- AWS Secrets Manager integration
+- Route53 integration
 
-## Deployment Process
+The EKS cluster uses:
 
-The deployment and destruction lifecycle is illustrated below.
+- Kubernetes 1.33
+- Control-plane logging
+- KMS secrets encryption
+- EKS access entries
+- EBS CSI
+- VPC CNI network policy support
 
-![Deployment and Destruction Flow](screenshots/deployment-destruction.png)
+---
 
-The project uses two custom automation scripts:
+# Terraform State
 
-- **deploy.sh** provisions the Kubernetes application after Terraform creates the AWS infrastructure.
-- **destroy.sh** removes Kubernetes resources before destroying the AWS infrastructure and verifies that no orphaned resources remain.
+Terraform uses remote state stored in Amazon S3.
 
-This workflow allows the environment to be deployed and destroyed consistently using repeatable automation while reducing manual intervention.
+```text
+S3 Bucket:
+mudassir-tf-state-893061519920
 
-### Stage 1 - Infrastructure Provisioning
+Platform State:
+jenkins/terraform.tfstate
 
-Terraform provisions and manages the AWS infrastructure required to support the Kubernetes environment, including:
+Bootstrap State:
+bootstrap/terraform.tfstate
+```
 
-- Virtual Private Cloud (VPC)
-- Amazon EKS Cluster
-- Managed Node Group
-- IAM Roles and Policies
-- OIDC Provider
-- Amazon EBS CSI Driver
-- AWS Load Balancer Controller
+Native S3 lockfile-based state locking is enabled.
 
-Terraform follows a predictable Infrastructure as Code workflow:
+This keeps Terraform state outside the local machine and allows CI/CD to operate against the same remote state.
+
+---
+
+# Karpenter
+
+Karpenter is used for Kubernetes node provisioning.
+
+The project includes:
+
+- Karpenter controller
+- IAM permissions
+- EC2NodeClass
+- NodePool
+- Required subnet and security-group discovery tags
+
+This allows Kubernetes workloads to trigger dynamic node provisioning instead of relying entirely on statically defined worker nodes.
+
+---
+
+# Storage
+
+Persistent storage is provided through the AWS EBS CSI driver.
+
+The project includes:
+
+- EBS CSI EKS add-on
+- IAM permissions for EBS CSI
+- IRSA
+- `gp3` StorageClass
+- `gp3-retain` StorageClass
+- VolumeSnapshotClass
+
+## Storage Classes
+
+```text
+gp3
+├── ReclaimPolicy: Delete
+└── Used for normal persistent workloads
+
+gp3-retain
+├── ReclaimPolicy: Retain
+└── Used for PostgreSQL
+```
+
+PostgreSQL uses `gp3-retain` so that the underlying persistent volume is not automatically deleted when the Kubernetes claim is removed.
+
+This also introduced an important operational lesson: retained EBS volumes can survive cluster destruction and must be deliberately accounted for during cleanup.
+
+---
+
+# PostgreSQL
+
+PostgreSQL runs inside the Kubernetes cluster as a StatefulSet.
+
+Configuration includes:
+
+- PostgreSQL 16.9
+- 1 replica
+- 20Gi persistent volume
+- `gp3-retain`
+- Persistent `PGDATA`
+- Kubernetes Secret generated through External Secrets
+- Liveness/readiness checks
+
+The PostgreSQL storage lifecycle was tested using Kubernetes snapshot and restore workflows.
+
+---
+
+# Redis
+
+Redis runs as a StatefulSet with persistent storage.
+
+Configuration includes:
+
+- Redis 8.2
+- 1 replica
+- 10Gi persistent volume
+- `gp3`
+- Append-only file persistence
+- Password authentication
+- Readiness/liveness checks
+
+Redis is used as the platform's stateful caching/data component.
+
+---
+
+# Secrets Management
+
+Application secrets are not stored directly in Git.
+
+The platform uses:
+
+```text
+AWS Secrets Manager
+        |
+        v
+External Secrets
+        |
+        v
+Kubernetes Secret
+        |
+        v
+Application
+```
+
+External Secrets uses:
+
+- IAM
+- IRSA
+- AWS Secrets Manager
+- KMS permissions
+
+The External Secrets IAM policy is restricted to the required Secrets Manager and KMS operations.
+
+During deployment validation, an IRSA lifecycle issue was discovered where an existing External Secrets controller pod had been created before the required IAM mutation was available.
+
+The issue was diagnosed by comparing the existing controller pod with a newly created test pod and confirming the presence of:
+
+```text
+AWS_ROLE_ARN
+AWS_WEB_IDENTITY_TOKEN_FILE
+aws-iam-token
+```
+
+The permanent Terraform configuration was then updated so the External Secrets IAM role has permission to decrypt the specific KMS key used by the secrets.
+
+---
+
+# Event Bus
+
+The application uses Amazon SQS for asynchronous event processing.
+
+The platform includes:
+
+```text
+orders queue
+     |
+     v
+worker
+     |
+     v
+orders DLQ
+```
+
+Configuration includes:
+
+- 30 second visibility timeout
+- 4 day message retention
+- 20 second long polling
+- Dead Letter Queue
+- 14 day DLQ retention
+- Maximum receive count of 5
+
+IAM permissions are separated between event producers and consumers.
+
+Producers can send messages while the worker can receive, delete, and inspect queue attributes.
+
+---
+
+# Ingress and TLS
+
+External application traffic enters through an AWS Network Load Balancer.
+
+```text
+Internet
+   |
+   v
+AWS Network Load Balancer
+   |
+   v
+Traefik
+   |
+   v
+Kubernetes Ingress
+   |
+   v
+api-gateway
+```
+
+Traefik is deployed as a Kubernetes LoadBalancer service using:
+
+- AWS NLB
+- Internet-facing scheme
+- IP target mode
+- `traefik` ingress class
+- HTTP to HTTPS redirection
+
+---
+
+# TLS
+
+TLS certificates are managed by cert-manager and Let's Encrypt.
+
+The platform uses an ACME DNS-01 challenge.
+
+```text
+cert-manager
+     |
+     v
+Let's Encrypt
+     |
+     v
+Route53 DNS challenge
+     |
+     v
+TLS Certificate
+```
+
+The application hostname is:
+
+```text
+jenkins.mud-as-sir.uk
+```
+
+The Kubernetes ingress uses the generated TLS secret and routes traffic to the application gateway.
+
+---
+
+# GitOps
+
+ArgoCD manages Kubernetes application state.
+
+The platform uses an **App-of-Apps** architecture.
+
+```text
+platform-root
+      |
+      +-- e-commerce-dev
+      +-- e-commerce-prod
+      +-- postgres
+      +-- redis
+      +-- secrets
+      +-- storage
+      +-- monitoring
+      +-- monitoring-stack
+      +-- cert-manager
+      +-- security
+```
+
+The ArgoCD root application tracks:
+
+```text
+terraform/infrastructure/argocd/applications
+```
+
+against:
+
+```text
+stable-v1.31
+```
+
+## Development
+
+Development uses automated synchronization with:
+
+- prune
+- self-heal
+
+## Production
+
+Production deliberately uses manual synchronization.
+
+This allows production changes to be reviewed before they are applied.
+
+Git remains the source of truth for Kubernetes configuration.
+
+---
+
+# Kustomize
+
+The application uses a base/overlay structure.
+
+```text
+application/
+├── base/
+│   ├── services/
+│   ├── kustomization.yaml
+│   └── ...
+│
+└── overlays/
+    ├── dev/
+    └── prod/
+```
+
+This allows the same application definitions to be reused while applying environment-specific configuration.
+
+Examples include:
+
+- replica counts
+- HPA configuration
+- environment-specific settings
+
+---
+
+# Observability
+
+The platform uses the Prometheus and Grafana ecosystem.
+
+The monitoring stack is deployed using:
+
+```text
+kube-prometheus-stack
+```
+
+Components include:
+
+- Prometheus
+- Grafana
+- Alertmanager
+- ServiceMonitors
+- Prometheus rules
+- Persistent storage
+
+## Prometheus
+
+Prometheus uses:
+
+```text
+20Gi gp3 PVC
+7 day retention
+```
+
+## Grafana
+
+Grafana uses:
+
+```text
+5Gi gp3 PVC
+```
+
+The monitoring configuration includes ServiceMonitors and dashboards for the application services.
+
+---
+
+# CI/CD
+
+GitHub Actions provides the CI/CD pipeline.
+
+The project uses GitHub Actions OIDC to authenticate with AWS.
+
+No long-lived AWS access keys are required by the workflows.
+
+---
+
+## Application Pipeline
+
+The application pipeline performs:
+
+1. Matrix-based service processing
+2. Go linting
+3. Dependency download
+4. Build
+5. Unit tests
+6. Trivy filesystem scanning
+7. AWS authentication through OIDC
+8. ECR authentication
+9. Docker image build
+10. Container image scanning
+11. ECR push
+12. Commit-SHA tagging
+13. Kustomize validation
+14. Manifest image update
+15. Git commit and push
+
+Images are tagged using the Git commit SHA rather than relying on `latest`.
+
+Example:
+
+```text
+68bf0180...
+```
+
+This makes deployments traceable to an exact source revision.
+
+---
+
+# Infrastructure Pipeline
+
+The Terraform pipeline performs:
+
+```text
+Terraform fmt
+      |
+      v
+Terraform init
+      |
+      v
+Terraform validate
+      |
+      v
+TFLint
+      |
+      v
+Checkov
+      |
+      v
+Terraform plan
+      |
+      v
+Required approval
+      |
+      v
+Terraform apply
+```
+
+The deployment workflow uses the `terraform-production` GitHub environment with required reviewer approval.
+
+The pipeline applies the exact Terraform plan artifact that was generated during the plan stage.
+
+---
+
+# Kubernetes Validation
+
+The project also includes Kubernetes validation workflows covering:
+
+- Kubernetes manifest validation
+- Kustomize validation
+- Configuration checks
+
+This provides an additional validation layer before Kubernetes configuration reaches the cluster.
+
+---
+
+# Security
+
+Security controls implemented throughout the project include:
+
+- GitHub Actions OIDC
+- No static AWS credentials in CI/CD
+- IAM least-privilege policies
+- IRSA
+- KMS encryption
+- EKS secrets encryption
+- AWS Secrets Manager
+- External Secrets
+- Container image scanning
+- Trivy
+- Kubernetes resource limits
+- Liveness/readiness probes
+- Non-root containers
+- Runtime container hardening
+- Network policy support
+- VPC Flow Logs
+- Restricted IAM trust policies
+
+Application containers use a non-root runtime user:
+
+```text
+UID 10001
+```
+
+---
+
+# Disaster Recovery and Storage Restore
+
+Persistent workloads were designed with storage recovery in mind.
+
+The project includes:
+
+- EBS VolumeSnapshotClass
+- PostgreSQL snapshot manifests
+- PostgreSQL restore manifests
+- Restore test workflow
+- Retained PostgreSQL storage
+- Documented snapshot/restore procedure
+
+PostgreSQL restore testing was successfully completed as part of the project validation.
+
+---
+
+# Deployment
+
+The project can be deployed using the Terraform/deployment workflow.
+
+From the repository root:
 
 ```bash
-terraform fmt
+cd terraform
+terraform init
 terraform validate
 terraform plan
 terraform apply
 ```
 
-This ensures infrastructure changes are reviewed before being applied and can be recreated consistently across deployments.
+The repository also contains deployment automation for bringing up the complete platform.
 
-### Stage 2 - Application Deployment
-
-Once the infrastructure has been successfully provisioned, the `deploy.sh` script automates the Kubernetes deployment.
-
-The deployment script performs the following tasks:
-
-- Verifies Kubernetes cluster connectivity
-- Confirms worker nodes are ready
-- Verifies the StorageClass
-- Creates the Jenkins namespace
-- Deploys the Persistent Volume Claim (PVC)
-- Deploys the Jenkins Deployment
-- Deploys the Kubernetes Service
-- Waits for the Jenkins Pod to become ready
-- Verifies the PVC has successfully bound to an Amazon EBS volume
-- Deploys the Kubernetes Ingress
-- Waits for the Application Load Balancer to become available
-- Displays the final deployment status
-
-This automation removes the need to manually execute Kubernetes commands while validating that each deployment stage completes successfully before continuing.
-
-### Deployment Validation
-
-#### Terraform Deployment
-
-![Terraform Deployment](screenshots/deploy-success.png)
-
-#### Kubernetes Worker Node
-
-![Worker Node](screenshots/kubectl-get-nodes.png)
-
-#### Running Jenkins Pod
-
-![Running Pod](screenshots/kubectl-get-pods.png)
-
-#### Persistent Volume Claim
-
-![Persistent Volume Claim](screenshots/kubectl-get-pvc.png)
-
-#### Kubernetes Ingress
-
-![Ingress](screenshots/kubectl-get-ingress.png)
+Before deployment, Terraform plans should always be reviewed before applying infrastructure changes.
 
 ---
 
-## Environment Cleanup
+# Destruction
 
-The project includes an automated `destroy.sh` script that safely removes the Kubernetes application and AWS infrastructure while validating that resources have been cleaned up correctly.
+The environment can be destroyed using the project destruction script:
 
-The destruction process follows the reverse order of deployment to minimise dependency issues and reduce the risk of orphaned AWS resources.
+```bash
+./terraform/scripts/destroy.sh
+```
 
-The cleanup process performs the following actions:
+The destroy workflow includes cleanup and verification for resources that may otherwise remain behind after EKS destruction.
 
-- Deletes the Kubernetes Ingress
-- Waits for the Application Load Balancer to be removed
-- Deletes the Jenkins Service
-- Deletes the Jenkins Deployment
-- Deletes the Persistent Volume Claim
-- Deletes the Jenkins namespace
-- Waits for namespace removal
-- Executes Terraform destroy
-- Verifies that VPCs have been removed
-- Verifies that Amazon EBS volumes have been removed
-- Removes orphaned CloudWatch Log Groups if required
-- Confirms infrastructure cleanup has completed
+This includes checks for:
 
-During development, additional validation steps were added after discovering orphaned Amazon EBS volumes and CloudWatch Log Groups following infrastructure destruction. These improvements increased confidence that the environment could be recreated from scratch without incurring unnecessary AWS costs.
+- EKS
+- VPC
+- Load Balancers
+- Security Groups
+- NAT infrastructure
+- Elastic IPs
+- SQS queues
+- Kubernetes resources
+- EKS control-plane log groups
 
-### Cleanup Validation
-
-![Environment Destroyed](screenshots/destroy-success.png)
+ECR repositories are intentionally preserved.
 
 ---
 
-## Challenges & Troubleshooting
+# Challenges and Troubleshooting
 
-Throughout the project, several real-world challenges were encountered that required investigation, testing, and iterative improvements. Rather than relying on manual intervention, these issues were analysed and resolved through automation wherever possible.
+One of the main goals of this project was to encounter realistic infrastructure problems and solve them rather than simply following a deployment guide.
 
-### IAM Roles for Service Accounts (IRSA)
+## External Secrets IRSA Failure
 
-One of the most significant challenges was configuring IRSA for the AWS Load Balancer Controller. Without the correct IAM role and trust relationship, the controller was unable to create and manage AWS resources such as Application Load Balancers and Target Groups.
+### Problem
 
-The solution involved configuring an OIDC provider for the EKS cluster, creating a dedicated IAM role, and associating that role with the Kubernetes service account using IRSA. This allowed the controller to securely authenticate with AWS while following the principle of least privilege.
-
----
-
-### Persistent Storage
-
-Understanding Kubernetes persistent storage required learning the relationship between Persistent Volume Claims (PVCs), Persistent Volumes (PVs), and Amazon EBS volumes.
-
-Testing confirmed that deleting a pod did not result in data loss because Jenkins stored its data on an Amazon EBS volume rather than inside the container itself. When Kubernetes recreated the pod, the existing volume was automatically reattached.
-
----
-
-### Infrastructure Cleanup
-
-During early testing, Terraform successfully destroyed the infrastructure but orphaned AWS resources occasionally remained, including Amazon EBS volumes and CloudWatch Log Groups.
-
-To resolve this, additional verification and cleanup steps were incorporated into the `destroy.sh` script to ensure that resources were properly removed and unnecessary AWS costs were avoided.
-
----
-
-### Deployment Validation
-
-The deployment process was improved by introducing validation checks between each deployment stage.
-
-Rather than assuming resources had been created successfully, the deployment script now verifies worker node readiness, Persistent Volume Claim binding, Application Load Balancer creation, Kubernetes Service creation, and Jenkins pod availability before proceeding to the next step.
-
----
-
-## Lessons Learned
-
-### Plan Before Building
-
-Breaking the project into smaller objectives made it easier to visualise the final architecture, organise development tasks, and troubleshoot issues as they occurred. A structured plan reduced unnecessary complexity and kept development focused on the overall project goals.
-
-### Track and Verify Resources
-
-One of the biggest lessons from this project was the importance of validating infrastructure rather than assuming resources had been created or removed successfully. Discovering orphaned Amazon EBS volumes and CloudWatch Log Groups reinforced the need for automated verification during both deployment and destruction.
-
-### Document Everything
-
-Maintaining documentation throughout the project reinforced my understanding of the technologies being used while creating a valuable reference for future projects. Recording architectural decisions, troubleshooting steps, and improvements also helped identify opportunities for optimisation, including reducing infrastructure costs by moving from a t3.medium instance to a t3.small instance.
-
-### Test Everything
-
-Every major component of the project was tested throughout its lifecycle. Persistent storage, HTTPS connectivity, automated deployment, infrastructure destruction, and resource cleanup were all validated to ensure the environment behaved as expected under real deployment conditions.
-
-Testing both successful deployments and complete environment destruction gave me a much deeper understanding of infrastructure dependencies and reinforced the importance of validating every stage of the infrastructure lifecycle.
-
----
-
-## Future Improvements
-
-Although the project successfully achieved its objectives, there are several enhancements that could be implemented in future iterations.
-
-Future improvements include:
-
-- Manage Cloudflare DNS records using the Terraform Cloudflare Provider to automatically update the Jenkins CNAME whenever a new Application Load Balancer is created.
-- Automatically request and validate AWS Certificate Manager certificates through Terraform.
-- Store Kubernetes manifests as Terraform resources for a fully Infrastructure as Code deployment.
-- Implement GitHub Actions for Continuous Integration and Continuous Deployment (CI/CD).
-- Introduce monitoring using Prometheus and Grafana.
-- Collect application logs using CloudWatch Container Insights.
-- Deploy multiple environments (Development, Staging, Production).
-- Replace shell script automation with Terraform modules where appropriate.
-- Improve security by integrating AWS Secrets Manager or External Secrets Operator.
-- Implement Horizontal Pod Autoscaling for improved scalability.
-
----
-
-## Repository Structure
+PostgreSQL and application pods initially entered:
 
 ```text
-jenkins-eks-challenge/
+CreateContainerConfigError
+```
+
+The External Secrets controller could not decrypt the required secret.
+
+### Investigation
+
+A newly created test pod using the External Secrets ServiceAccount was compared with the existing controller pod.
+
+The new pod received:
+
+```text
+AWS_ROLE_ARN
+AWS_WEB_IDENTITY_TOKEN_FILE
+aws-iam-token
+```
+
+This confirmed the IRSA webhook was functioning correctly for newly created pods.
+
+### Root Cause
+
+The existing controller pod had been created before the required IAM mutation was available.
+
+### Resolution
+
+The controller was restarted and the IAM configuration was permanently updated through Terraform.
+
+The IAM policy was given:
+
+```text
+kms:Decrypt
+```
+
+permission against the specific Secrets Manager KMS key.
+
+After the controller restarted:
+
+```text
+ExternalSecret: SecretSynced
+PostgreSQL: Ready
+```
+
+---
+
+## ArgoCD Root Application State
+
+The production ArgoCD application intentionally uses manual synchronization.
+
+This meant the root application could report:
+
+```text
+OutOfSync
+Healthy
+```
+
+even though the platform was healthy.
+
+The deployment script was therefore changed to wait for:
+
+```text
+Healthy
+```
+
+rather than requiring:
+
+```text
+Synced + Healthy
+```
+
+This prevents the deployment process from treating intentional production drift as a deployment failure.
+
+---
+
+## Terraform Destroy Cleanup
+
+The first complete destruction revealed that the EKS control-plane log group remained after Terraform destroyed the cluster.
+
+The log group:
+
+```text
+/aws/eks/jenkins-eks/cluster
+```
+
+was automatically created by EKS rather than being directly managed by Terraform.
+
+The destruction script was updated to discover and remove the relevant EKS log groups and then verify that they no longer existed.
+
+The final destruction was successfully validated with no remaining:
+
+- EKS cluster
+- VPC
+- Load Balancers
+- NAT resources
+- EKS security groups
+- SQS queues
+- EKS control-plane log groups
+
+ECR was intentionally preserved.
+
+---
+
+# Lessons Learned
+
+## Infrastructure as Code Is More Than Creating Resources
+
+Terraform makes infrastructure reproducible, but resource lifecycle still needs to be understood.
+
+AWS-managed or automatically generated resources may not behave exactly like resources directly managed by Terraform.
+
+---
+
+## Kubernetes Storage Has Lifecycle Implications
+
+A PVC disappearing does not necessarily mean the underlying AWS storage has disappeared.
+
+Using:
+
+```text
+Retain
+```
+
+means storage must be deliberately managed and recovered or deleted.
+
+This is particularly important for databases.
+
+---
+
+## IRSA Depends on Pod Lifecycle
+
+Adding or correcting an IAM role does not necessarily update already-running pods.
+
+When debugging IRSA, checking the actual pod environment and projected token is often more useful than only checking the IAM configuration.
+
+---
+
+## GitOps Changes the Deployment Model
+
+With ArgoCD, the deployment pipeline does not need to directly apply Kubernetes manifests.
+
+Instead:
+
+```text
+Git change
+    |
+    v
+ArgoCD
+    |
+    v
+Kubernetes
+```
+
+This provides a clear separation between infrastructure provisioning and application reconciliation.
+
+---
+
+## Production Should Not Be Treated Like Development
+
+Development can use:
+
+```text
+automated sync
+prune
+self-heal
+```
+
+Production deliberately uses manual synchronization.
+
+This creates a review point before production changes are applied.
+
+---
+
+## Image Tags Should Be Immutable
+
+Using:
+
+```text
+:latest
+```
+
+makes it difficult to determine exactly what version is running.
+
+Using the Git commit SHA provides a direct relationship between:
+
+```text
+Git commit
+     |
+     v
+Docker image
+     |
+     v
+Kubernetes deployment
+```
+
+---
+
+# Repository Structure
+
+The repository is organised around infrastructure, Kubernetes configuration, CI/CD, and deployment automation.
+
+```text
+.
+├── .github/
+│   └── workflows/
+│       ├── application-ci.yml
+│       ├── kubernetes-validation.yaml
+│       ├── terraform-deploy.yml
+│       └── validate.yaml
 │
 ├── bootstrap/
-│   ├── main.tf
-│   ├── providers.tf
-│   ├── versions.tf
-│   ├── terraform.tfstate
-│   └── terraform.tfstate.backup
-│
-├── kubernetes/
-│   └── jenkins/
-│
-├── screenshots/
-│   ├── architecture-overview.png
-│   ├── deployment-destruction.png
-│   ├── storage-lifecycle.png
-│   ├── cloudflare-dns.png
-│   ├── deploy-success.png
-│   ├── destroy-success.png
-│   ├── jenkins-dashboard-https.png
-│   ├── kubectl-get-ingress.png
-│   ├── kubectl-get-nodes.png
-│   ├── kubectl-get-pods.png
-│   └── kubectl-get-pvc.png
+│   └── Terraform configuration for persistent GitHub OIDC access
 │
 ├── terraform/
 │   ├── main.tf
-│   ├── providers.tf
 │   ├── variables.tf
 │   ├── outputs.tf
-│   ├── iam.tf
+│   ├── providers.tf
+│   ├── backend.tf
 │   ├── helm.tf
-│   ├── deploy.sh
-│   ├── destroy.sh
-│   ├── jenkins-deployment.yaml
-│   ├── jenkins-service.yaml
-│   ├── jenkins-pvc.yaml
-│   ├── jenkins-ingress.yaml
-│   ├── iam_policy.json
-│   └── test-pod.yaml
+│   │
+│   ├── modules/
+│   │   ├── eks/
+│   │   ├── iam/
+│   │   ├── vpc/
+│   │   ├── ecr/
+│   │   ├── sqs/
+│   │   ├── secrets/
+│   │   ├── argocd/
+│   │   └── ...
+│   │
+│   ├── infrastructure/
+│   │   ├── application/
+│   │   │   ├── base/
+│   │   │   └── overlays/
+│   │   │       ├── dev/
+│   │   │       └── prod/
+│   │   │
+│   │   ├── argocd/
+│   │   │   └── applications/
+│   │   │
+│   │   └── monitoring/
+│   │
+│   └── scripts/
+│       ├── deploy.sh
+│       └── destroy.sh
 │
-├── iam_policy.json
-├── README.md
-└── .gitignore
+├── services/
+│   ├── api-gateway/
+│   ├── order-service/
+│   ├── inventory-service/
+│   ├── payment-service/
+│   ├── notification-service/
+│   ├── shipping-service/
+│   ├── worker/
+│   ├── scheduler/
+│   └── dashboard-api/
+│
+└── README.md
 ```
 
 ---
 
-## Deployment
+# Core 100 Validation
 
-Deploy the complete environment:
+The project was audited against the Core 100 requirements.
 
-```bash
-cd terraform
-chmod +x deploy.sh
-./deploy.sh
-```
+| Phase | Requirement | Status |
+|---|---|---|
+| 1 | Infrastructure | PASS |
+| 2 | Storage | PASS |
+| 3 | Stateful Tier | PASS |
+| 4 | Application | PASS |
+| 5 | Event Bus | PASS |
+| 6 | Ingress | PASS |
+| 7 | GitOps | PASS |
+| 8 | Observability | PASS |
+| 9 | CI/CD | PASS |
+| 10 | Documentation | In progress |
 
-The deployment script provisions the Kubernetes application after the AWS infrastructure has been created by Terraform and performs validation throughout the deployment process.
-
----
-
-## Environment Destruction
-
-Destroy the complete environment:
-
-```bash
-cd terraform
-chmod +x destroy.sh
-./destroy.sh
-```
-
-The destruction script removes Kubernetes resources before executing Terraform destroy and performs verification to ensure infrastructure has been cleaned up successfully.
+The first nine phases were implemented and validated through Terraform checks, repository inspection, CI/CD validation, Kubernetes deployment testing, and live EKS validation.
 
 ---
 
-## Author
+# Validation Approach
 
-**Mudassir**
+The project was not considered complete simply because Terraform could create resources.
 
-This project was built as part of my DevOps portfolio to strengthen my understanding of Kubernetes, Terraform, AWS, Infrastructure as Code, and cloud-native application deployment. The focus of the project was not only to deploy an application but also to understand the reasoning behind each architectural decision, automate repetitive tasks, and validate the complete infrastructure lifecycle from deployment through destruction.
+Validation included:
+
+- Terraform validation
+- Terraform plan review
+- TFLint
+- Checkov
+- Shell validation
+- Kustomize validation
+- Docker builds
+- Trivy scanning
+- GitHub Actions validation
+- Live EKS deployment
+- Kubernetes readiness checks
+- ArgoCD health checks
+- PostgreSQL readiness
+- Redis readiness
+- Persistent volume validation
+- Monitoring validation
+- Snapshot/restore testing
+- Destroy and cleanup verification
+
+The platform was successfully deployed to EKS and subsequently destroyed after validation to avoid leaving unnecessary AWS resources running.
+
+---
+
+# Project Status
+
+The implementation has completed the Core 100 requirements through the first nine phases.
+
+The final documentation phase is being completed through this README.
+
+The project demonstrates the full lifecycle:
+
+```text
+Design
+  |
+  v
+Terraform
+  |
+  v
+AWS Infrastructure
+  |
+  v
+EKS
+  |
+  v
+Kubernetes Platform
+  |
+  v
+Application Deployment
+  |
+  v
+GitOps
+  |
+  v
+Observability
+  |
+  v
+CI/CD
+  |
+  v
+Validation
+  |
+  v
+Troubleshooting
+  |
+  v
+Destruction
+```
+
+The environment can therefore be created, validated, and destroyed through Infrastructure as Code rather than depending on manually configured infrastructure.
+
+---
+
+# Author
+
+**Mudassir Shaikh**
+
+DevOps / Cloud Engineering Portfolio Project
+
+Technologies demonstrated:
+
+```text
+AWS
+Amazon EKS
+Terraform
+Kubernetes
+Docker
+Kustomize
+ArgoCD
+GitHub Actions
+Karpenter
+Traefik
+cert-manager
+Let's Encrypt
+Prometheus
+Grafana
+PostgreSQL
+Redis
+Amazon SQS
+AWS Secrets Manager
+External Secrets
+Amazon ECR
+IAM
+IRSA
+KMS
+Route53
+```
