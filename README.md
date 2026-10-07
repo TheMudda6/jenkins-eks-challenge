@@ -321,6 +321,8 @@ External Secrets uses:
 
 The External Secrets IAM policy is restricted to the required Secrets Manager and KMS operations.
 
+For the documented secret rotation procedure, see [Secrets Rotation](docs/secrets-rotation.md).
+
 During deployment validation, an IRSA lifecycle issue was discovered where an existing External Secrets controller pod had been created before the required IAM mutation was available.
 
 The issue was diagnosed by comparing the existing controller pod with a newly created test pod and confirming the presence of:
@@ -674,6 +676,8 @@ The project includes:
 - Documented snapshot/restore procedure
 
 PostgreSQL restore testing was successfully completed as part of the project validation.
+
+The detailed storage and restore procedure is documented in [Storage and PostgreSQL Restore](docs/storage-restore.md).
 
 ---
 
