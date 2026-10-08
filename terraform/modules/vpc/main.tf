@@ -169,14 +169,25 @@ resource "aws_iam_role_policy" "vpc_flow_logs" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid      = "CreateLogGroup"
+        Effect   = "Allow"
+        Action   = "logs:CreateLogGroup"
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/vpc/${var.vpc_name}/flow-logs"
+      },
+      {
+        Sid    = "PublishFlowLogs"
         Effect = "Allow"
         Action = [
-          "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
           "logs:DescribeLogStreams"
         ]
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/vpc/${var.vpc_name}/flow-logs:*"
+      },
+      {
+        Sid      = "DescribeLogGroups"
+        Effect   = "Allow"
+        Action   = "logs:DescribeLogGroups"
         Resource = "*"
       }
     ]
