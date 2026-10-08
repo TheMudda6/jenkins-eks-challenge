@@ -5,8 +5,8 @@
 # Validate Kubernetes manifests automatically through GitHub Actions.
 #
 # This workflow verifies that deprecated External Secrets API versions
-# are not present and validates the Kubernetes manifests before changes
-# are merged.
+# are not present, renders the Kustomize configurations, and validates
+# the resulting Kubernetes resources before changes are merged.
 # --------------------------------------------------------------------
 
 name: Kubernetes Manifest Validation
@@ -22,7 +22,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
       - name: Check External Secrets API version
         run: |
@@ -31,7 +32,36 @@ jobs:
             exit 1
           fi
 
-      - name: Validate Kubernetes YAML
-        uses: instrumenta/kubeval-action@master
-        with:
-          files: terraform/infrastructure
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz
+          sudo install kubeconform /usr/local/bin/kubeconform
+          kubeconform -v
+
+      - name: Render development platform
+        run: |
+          kubectl kustomize terraform/infrastructure > /tmp/platform-dev.yaml
+
+      - name: Render production application
+        run: |
+          kubectl kustomize terraform/infrastructure/application/overlays/prod > /tmp/application-prod.yaml
+
+      - name: Validate development platform
+        run: |
+          kubeconform \
+            -strict \
+            -summary \
+            -ignore-missing-schemas \
+            -kubernetes-version 1.33.0 \
+            /tmp/platform-dev.yaml
+
+      - name: Validate production application
+        run: |
+          kubeconform \
+            -strict \
+            -summary \
+            -ignore-missing-schemas \
+            -kubernetes-version 1.33.0 \
+            /tmp/application-prod.yaml
