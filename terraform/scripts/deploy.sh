@@ -94,6 +94,36 @@ done
 echo "✓ ECR repositories are ready for Terraform."
 
 # ------------------------------------------------------------
+# Reuse VPC Flow Logs CloudWatch Log Group
+#
+# Import the existing log group when AWS already has it but
+# Terraform state does not track it, avoiding an AlreadyExists
+# error during the bootstrap plan.
+# ------------------------------------------------------------
+
+print_banner "Checking VPC Flow Logs Log Group"
+
+FLOW_LOG_GROUP="/aws/vpc/jenkins-vpc/flow-logs"
+FLOW_LOG_GROUP_ADDRESS="module.vpc.aws_cloudwatch_log_group.vpc_flow_logs"
+
+if aws logs describe-log-groups \
+  --region "$AWS_REGION" \
+  --log-group-name-prefix "$FLOW_LOG_GROUP" \
+  --query "logGroups[?logGroupName=='$FLOW_LOG_GROUP'].logGroupName" \
+  --output text | grep -Fxq "$FLOW_LOG_GROUP"; then
+
+  if ! terraform state show "$FLOW_LOG_GROUP_ADDRESS" >/dev/null 2>&1; then
+    echo "Existing VPC flow-log group is not tracked by Terraform."
+    terraform import "$FLOW_LOG_GROUP_ADDRESS" "$FLOW_LOG_GROUP"
+  else
+    echo "✓ VPC flow-log group is already tracked by Terraform."
+  fi
+
+else
+  echo "✓ VPC flow-log group does not exist; Terraform can create it."
+fi
+
+# ------------------------------------------------------------
 # Terraform plan
 # ------------------------------------------------------------
 
