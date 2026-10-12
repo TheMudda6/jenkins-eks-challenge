@@ -141,54 +141,60 @@ if [[ "$CLUSTER_EXISTS" == true ]]; then
 
   if kubectl cluster-info >/dev/null 2>&1; then
 
-    kubectl delete application platform-root \
-      -n argocd \
-      --ignore-not-found=true
+if kubectl get crd applications.argoproj.io >/dev/null 2>&1; then
 
-echo "✓ platform-root deletion requested."
-
-echo
-echo "Deleting ArgoCD child Applications..."
-
-for application in \
-  e-commerce-dev \
-  e-commerce-prod \
-  postgres \
-  redis \
-  secrets \
-  storage \
-  monitoring \
-  monitoring-stack \
-  security
-do
-  kubectl delete application "$application" \
+  kubectl delete application platform-root \
     -n argocd \
     --ignore-not-found=true
-done
 
-echo
-echo "Waiting for ArgoCD child Applications to disappear..."
+  echo "✓ platform-root deletion requested."
 
-for application in \
-  e-commerce-dev \
-  e-commerce-prod \
-  postgres \
-  redis \
-  secrets \
-  storage \
-  monitoring \
-  monitoring-stack \
-  security
-do
-  kubectl wait \
-    --for=delete \
-    "application/$application" \
-    -n argocd \
-    --timeout=120s \
-    2>/dev/null || true
-done
+  echo
+  echo "Deleting ArgoCD child Applications..."
 
-echo "✓ ArgoCD Applications released."
+  for application in \
+    e-commerce-dev \
+    e-commerce-prod \
+    postgres \
+    redis \
+    secrets \
+    storage \
+    monitoring \
+    monitoring-stack \
+    security
+  do
+    kubectl delete application "$application" \
+      -n argocd \
+      --ignore-not-found=true
+  done
+
+  echo
+  echo "Waiting for ArgoCD child Applications to disappear..."
+
+  for application in \
+    e-commerce-dev \
+    e-commerce-prod \
+    postgres \
+    redis \
+    secrets \
+    storage \
+    monitoring \
+    monitoring-stack \
+    security
+  do
+    kubectl wait \
+      --for=delete \
+      "application/$application" \
+      -n argocd \
+      --timeout=120s \
+      2>/dev/null || true
+  done
+
+  echo "✓ ArgoCD Applications released."
+
+else
+  echo "ArgoCD Application CRD is absent; skipping ArgoCD cleanup."
+fi
 
   print_banner "Cleaning Up External Secrets"
 
