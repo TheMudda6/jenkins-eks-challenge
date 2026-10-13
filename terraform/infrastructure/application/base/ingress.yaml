@@ -1,3 +1,7 @@
+# TLS certificate and Ingress routing for the e-commerce dashboard.
+# Routes API and authentication requests through the API Gateway,
+# while serving the public frontend from dashboard-api.
+
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -29,10 +33,31 @@ spec:
     - host: jenkins.mud-as-sir.uk
       http:
         paths:
-          - path: /
+          - path: /api
             pathType: Prefix
             backend:
               service:
                 name: api-gateway
                 port:
                   number: 8080
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+          - path: /healthz
+            pathType: Exact
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dashboard-api
+                port:
+                  number: 8086
