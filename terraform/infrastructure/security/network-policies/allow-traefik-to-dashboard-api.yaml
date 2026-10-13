@@ -1,0 +1,22 @@
+# Purpose: Allow Traefik ingress-controller pods to reach the dashboard API.
+# Scope: TCP port 8086 on dashboard-api pods in the jenkins namespace.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-to-dashboard-api
+  namespace: jenkins
+spec:
+  podSelector:
+    matchLabels:
+      app: dashboard-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+      ports:
+        - protocol: TCP
+          port: 8086

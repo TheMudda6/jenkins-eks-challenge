@@ -21,3 +21,4 @@ resources:
   - allow-prometheus-to-dashboard-api.yaml
   - allow-prometheus-to-worker.yaml
   - allow-prometheus-to-scheduler.yaml
+  - allow-traefik-to-dashboard-api.yaml
