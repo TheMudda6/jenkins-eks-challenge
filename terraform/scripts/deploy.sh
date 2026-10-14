@@ -17,6 +17,19 @@ print_banner() {
 }
 
 # ------------------------------------------------------------
+# Bounded diagnostics
+#
+# Purpose:
+# Prevent troubleshooting commands from hanging indefinitely
+# after a deployment or readiness check has failed.
+# ------------------------------------------------------------
+
+run_diagnostic() {
+  echo "+ $*"
+  timeout 5s "$@" || echo "Diagnostic unavailable or timed out: $*"
+}
+
+# ------------------------------------------------------------
 # Prerequisites
 # ------------------------------------------------------------
 
@@ -37,6 +50,11 @@ command -v kubectl >/dev/null || {
 
 command -v helm >/dev/null || {
   echo "ERROR: Helm is not installed."
+  exit 1
+}
+
+command -v curl >/dev/null || {
+  echo "ERROR: curl is not installed."
   exit 1
 }
 
@@ -530,6 +548,231 @@ kubectl get deployment,service -n jenkins
 echo
 echo "Monitoring:"
 kubectl get pods -n monitoring
+
+# Wait for ExternalDNS before checking public DNS.
+print_banner "Waiting for ExternalDNS"
+
+kubectl rollout status deployment/external-dns \
+  -n external-dns \
+  --timeout=300s
+
+echo "✓ ExternalDNS is ready."
+
+# ------------------------------------------------------------
+# Verify public Jenkins DNS
+#
+# Purpose:
+# Wait for ExternalDNS to publish the Jenkins record after startup.
+# Confirm the Route 53 A record targets the current Traefik NLB,
+# its TXT ownership record belongs to ExternalDNS, and public DNS
+# resolves to an address currently returned by that NLB.
+# ------------------------------------------------------------
+
+print_banner "Verifying Public DNS"
+
+JENKINS_HOST="jenkins.mud-as-sir.uk"
+DNS_TIMEOUT_SECONDS=600
+DNS_POLL_SECONDS=10
+DNS_DEADLINE=$((SECONDS + DNS_TIMEOUT_SECONDS))
+TRAEFIK_NLB_HOST=""
+
+# Read the same literal hosted-zone ID Terraform uses from terraform.tfvars.
+# This avoids selecting a different public hosted zone with a matching name.
+ROUTE53_ZONE_ID="$(
+  awk -F '"' '/^[[:space:]]*route53_zone_id[[:space:]]*=/ {
+    print $2
+    exit
+  }' "$TERRAFORM_DIR/terraform.tfvars"
+)"
+
+if [[ ! "$ROUTE53_ZONE_ID" =~ ^Z[A-Z0-9]+$ ]]; then
+  echo "ERROR: Could not read a valid route53_zone_id from terraform.tfvars."
+  exit 1
+fi
+
+echo "Using configured Route 53 hosted zone: $ROUTE53_ZONE_ID"
+echo "Waiting for Traefik's Network Load Balancer hostname..."
+
+while (( SECONDS < DNS_DEADLINE )); do
+  TRAEFIK_NLB_HOST="$(
+    timeout 8s kubectl get service traefik -n traefik \
+      -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' \
+      2>/dev/null || true
+  )"
+
+  if [[ -n "$TRAEFIK_NLB_HOST" ]]; then
+    break
+  fi
+
+  sleep "$DNS_POLL_SECONDS"
+done
+
+if [[ -z "$TRAEFIK_NLB_HOST" ]]; then
+  echo "ERROR: Traefik did not publish an NLB hostname within ${DNS_TIMEOUT_SECONDS}s."
+  run_diagnostic kubectl get service traefik -n traefik -o wide
+  run_diagnostic kubectl describe service traefik -n traefik
+  exit 1
+fi
+
+TRAEFIK_NLB_HOST="${TRAEFIK_NLB_HOST%.}"
+echo "✓ Traefik NLB hostname: $TRAEFIK_NLB_HOST"
+
+DNS_READY=false
+ROUTE53_RECORDS='[]'
+NLB_IPS=''
+PUBLIC_IPS=''
+
+echo "Waiting for the Ingress, Route 53 records, and public DNS..."
+
+while (( SECONDS < DNS_DEADLINE )); do
+  INGRESS_NLB_HOST="$(
+    timeout 8s kubectl get ingress jenkins -n jenkins \
+      -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' \
+      2>/dev/null || true
+  )"
+  INGRESS_NLB_HOST="${INGRESS_NLB_HOST%.}"
+
+  NLB_IPS="$(
+    timeout 5s dig +time=2 +tries=1 +short A "$TRAEFIK_NLB_HOST" 2>/dev/null \
+      | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' \
+      | sort -u || true
+  )"
+
+  PUBLIC_IPS="$(
+    timeout 5s dig +time=2 +tries=1 +short A "$JENKINS_HOST" 2>/dev/null \
+      | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' \
+      | sort -u || true
+  )"
+
+  ROUTE53_RECORDS="$(
+    timeout 8s aws route53 list-resource-record-sets \
+      --hosted-zone-id "$ROUTE53_ZONE_ID" \
+      --query "ResourceRecordSets[?Name==\`${JENKINS_HOST}.\`]" \
+      --output json 2>/dev/null || echo '[]'
+  )"
+
+  A_RECORD_VALID=false
+  TXT_RECORD_VALID=false
+
+  if printf '%s' "$ROUTE53_RECORDS" | jq -e \
+    --arg host "${JENKINS_HOST}." \
+    --arg nlb "$TRAEFIK_NLB_HOST" \
+    --argjson nlb_ips "$(printf '%s\n' "$NLB_IPS" | jq -Rsc 'split("\n") | map(select(length > 0))')" \
+    '
+      any(.[];
+        .Name == $host and .Type == "A" and
+        (
+          (
+            ((.AliasTarget.DNSName // "") | ascii_downcase
+              | sub("\\.$"; "") | sub("^dualstack\\."; ""))
+            ==
+            ($nlb | ascii_downcase
+              | sub("\\.$"; "") | sub("^dualstack\\."; ""))
+          )
+          or
+          any((.ResourceRecords // [])[];
+            .Value as $value | $nlb_ips | index($value) != null)
+        )
+      )
+    ' >/dev/null 2>&1; then
+    A_RECORD_VALID=true
+  fi
+
+  if printf '%s' "$ROUTE53_RECORDS" | jq -e \
+    --arg host "${JENKINS_HOST}." \
+    --arg owner "external-dns/owner=jenkins-eks-challenge" \
+    '
+      any(.[];
+        .Name == $host and .Type == "TXT" and
+        any((.ResourceRecords // [])[];
+          (.Value | ltrimstr("\"") | rtrimstr("\"") | split(",")
+            | map(gsub("^\\s+|\\s+$"; ""))) as $metadata
+          | ($metadata | index($owner)) != null
+            and any($metadata[];
+              startswith("external-dns/resource=")
+              and length > ("external-dns/resource=" | length))
+        )
+      )
+    ' >/dev/null 2>&1; then
+    TXT_RECORD_VALID=true
+  fi
+
+  DNS_IP_OVERLAP=false
+  if [[ -n "$NLB_IPS" && -n "$PUBLIC_IPS" ]]; then
+    while IFS= read -r ip; do
+      if grep -Fqx -- "$ip" <<< "$PUBLIC_IPS"; then
+        DNS_IP_OVERLAP=true
+        break
+      fi
+    done <<< "$NLB_IPS"
+  fi
+
+  HTTPS_STATUS=""
+  HTTPS_CURL_EXIT="not_attempted"
+  HTTPS_READY=false
+
+  if [[ "$INGRESS_NLB_HOST" == "$TRAEFIK_NLB_HOST" ]] \
+    && [[ "$A_RECORD_VALID" == true ]] \
+    && [[ "$TXT_RECORD_VALID" == true ]] \
+    && [[ "$DNS_IP_OVERLAP" == true ]]; then
+    if HTTPS_STATUS="$(
+      timeout 12s curl --silent --show-error --output /dev/null \
+        --connect-timeout 5 --max-time 10 \
+        --write-out '%{http_code}' "https://${JENKINS_HOST}/" \
+        2>/dev/null
+    )"; then
+      HTTPS_CURL_EXIT=0
+    else
+      HTTPS_CURL_EXIT=$?
+    fi
+
+    if [[ "$HTTPS_CURL_EXIT" -eq 0 ]] \
+      && [[ "$HTTPS_STATUS" =~ ^[0-9]{3}$ ]] \
+      && (( 10#$HTTPS_STATUS >= 200 && 10#$HTTPS_STATUS < 400 )); then
+      HTTPS_READY=true
+      DNS_READY=true
+      break
+    fi
+  fi
+
+  sleep "$DNS_POLL_SECONDS"
+done
+
+if [[ "$DNS_READY" != true ]]; then
+  echo "ERROR: Public DNS did not become ready within ${DNS_TIMEOUT_SECONDS}s."
+  echo "Traefik NLB hostname: $TRAEFIK_NLB_HOST"
+  echo "Ingress hostname: ${INGRESS_NLB_HOST:-not published}"
+  echo "Route 53 A record valid: $A_RECORD_VALID"
+  echo "Route 53 TXT ownership valid: $TXT_RECORD_VALID"
+  echo "Public DNS overlaps current NLB IPs: $DNS_IP_OVERLAP"
+  echo "HTTPS response status: ${HTTPS_STATUS:-unavailable}"
+  echo "HTTPS curl exit code: $HTTPS_CURL_EXIT"
+  echo "HTTPS readiness: $HTTPS_READY"
+  echo
+  echo "Traefik Service:"
+  run_diagnostic kubectl get service traefik -n traefik -o wide
+  echo
+  echo "Jenkins Ingress:"
+  run_diagnostic kubectl get ingress jenkins -n jenkins -o yaml
+  echo
+  echo "ExternalDNS pods:"
+  run_diagnostic kubectl get pods -n external-dns -o wide
+  echo
+  echo "Recent ExternalDNS logs:"
+  run_diagnostic kubectl logs deployment/external-dns -n external-dns --tail=100
+  echo
+  echo "Route 53 records:"
+  printf '%s\n' "$ROUTE53_RECORDS" | jq . || true
+  echo
+  echo "Recent events:"
+  timeout 5s kubectl get events -A --sort-by='.lastTimestamp' 2>/dev/null | tail -40 || echo 'Recent events unavailable or timed out.'
+  exit 1
+fi
+
+echo "✓ Route 53 A record targets the current Traefik NLB."
+echo "✓ ExternalDNS TXT ownership record is present."
+echo "✓ Public DNS resolves to a current Traefik NLB address."
+echo "✓ HTTPS responded successfully (HTTP ${HTTPS_STATUS})."
 
 print_banner "Deployment Successful"
 

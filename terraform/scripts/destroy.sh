@@ -402,26 +402,66 @@ if [ "$DESTROY_CONFIRM" != "yes" ]; then
   exit 0
 fi
 
+# Stop ExternalDNS before removing its DNS records.
+# This runs only after the user confirms the Terraform destroy plan.
+print_banner "Stopping ExternalDNS Before DNS Cleanup"
+
+if kubectl get deployment external-dns -n external-dns >/dev/null 2>&1; then
+  kubectl scale deployment external-dns -n external-dns --replicas=0
+  kubectl rollout status deployment/external-dns -n external-dns --timeout=60s
+  echo "✓ ExternalDNS stopped."
+else
+  echo "✓ ExternalDNS deployment is already absent."
+fi
+
 print_banner "Cleaning Up ExternalDNS Records"
 
 ROUTE53_ZONE_ID="$(
-  aws route53 list-hosted-zones-by-name \
-    --dns-name "jenkins.mud-as-sir.uk." \
-    --query "HostedZones[?Name==\`jenkins.mud-as-sir.uk.\` && Config.PrivateZone==\`false\`].Id | [0]" \
-    --output text
+  awk -F '"' '/^[[:space:]]*route53_zone_id[[:space:]]*=/ {
+    print $2
+    exit
+  }' "$TERRAFORM_DIR/terraform.tfvars"
 )"
+
+if [[ ! "$ROUTE53_ZONE_ID" =~ ^Z[A-Z0-9]+$ ]]; then
+  echo "ERROR: Could not read a valid route53_zone_id from terraform.tfvars."
+  exit 1
+fi
 
 if [[ -n "$ROUTE53_ZONE_ID" && "$ROUTE53_ZONE_ID" != "None" ]]; then
   ROUTE53_ZONE_ID="${ROUTE53_ZONE_ID##*/}"
 
   echo "Cleaning Route53 records for jenkins.mud-as-sir.uk..."
 
+  # Fetch records for this hostname, then delete only records
+  # owned by this project's ExternalDNS registry.
   ROUTE53_RECORDS="$(
     aws route53 list-resource-record-sets \
       --hosted-zone-id "$ROUTE53_ZONE_ID" \
       --query "ResourceRecordSets[?Name=='jenkins.mud-as-sir.uk.' && (Type=='A' || Type=='AAAA' || Type=='TXT')]" \
       --output json
   )"
+
+  # Only delete the project's ExternalDNS TXT ownership record.
+  # Do not delete A/AAAA aliases unless ownership can be established
+  # safely from the matching TXT record.
+
+  OWNED_TXT="$(
+    jq -c --arg owner "jenkins-eks-challenge" '
+      [
+        .[] |
+        select(
+          .Type == "TXT" and
+          any((.ResourceRecords // [])[];
+            (.Value | ltrimstr("\"") | rtrimstr("\"") | split(",")
+              | map(gsub("^\\s+|\\s+$"; "")) | index("external-dns/owner=" + $owner)) != null
+          )
+        )
+      ]
+    ' <<< "$ROUTE53_RECORDS"
+  )"
+
+
 
   if [[ "$ROUTE53_RECORDS" != "[]" ]]; then
     jq -n \
@@ -438,6 +478,7 @@ if [[ -n "$ROUTE53_ZONE_ID" && "$ROUTE53_ZONE_ID" != "None" ]]; then
   else
     echo "✓ No project DNS records found."
   fi
+
 else
   echo "✓ Project Route53 hosted zone not found."
 fi
