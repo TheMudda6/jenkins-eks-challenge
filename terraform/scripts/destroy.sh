@@ -435,25 +435,35 @@ if [[ -n "$ROUTE53_ZONE_ID" && "$ROUTE53_ZONE_ID" != "None" ]]; then
 
   # Fetch records for this hostname, then delete only records
   # owned by this project's ExternalDNS registry.
-  ROUTE53_RECORDS="$(
+
+  if ! ROUTE53_RECORDS="$(
     aws route53 list-resource-record-sets \
       --hosted-zone-id "$ROUTE53_ZONE_ID" \
-      --query "ResourceRecordSets[?Name=='jenkins.mud-as-sir.uk.' && (Type=='A' || Type=='AAAA' || Type=='TXT')]" \
       --output json
-  )"
+  )"; then
+    echo "ERROR: Failed to list Route 53 records; refusing DNS cleanup."
+    exit 1
+  fi
 
 
   # Identify TXT records owned by this project's ExternalDNS registry.
+
   OWNED_TXT="$(
-    jq -c --arg owner "jenkins-eks-challenge" '
+    jq -c --arg owner "jenkins-eks-challenge" \
+      --arg cname_host "cname-.jenkins.mud-as-sir.uk." \
+      --arg aaaa_host "aaaa-.jenkins.mud-as-sir.uk." '
       [
-        .[] |
+        .ResourceRecordSets[] |
         select(
+          (.Name == $cname_host or .Name == $aaaa_host) and
           .Type == "TXT" and
           any((.ResourceRecords // [])[];
             (.Value | ltrimstr("\"") | rtrimstr("\"") | split(",")
-              | map(gsub("^\\s+|\\s+$"; ""))
-              | index("external-dns/owner=" + $owner)) != null
+              | map(gsub("^\\s+|\\s+$"; ""))) as $metadata
+            | ($metadata | index("external-dns/owner=" + $owner)) != null
+              and any($metadata[];
+                startswith("external-dns/resource=")
+                and length > ("external-dns/resource=" | length))
           )
         )
       ]

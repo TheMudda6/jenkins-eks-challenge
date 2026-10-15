@@ -167,6 +167,11 @@ resource "helm_release" "external_dns" {
     value = "jenkins-eks-challenge"
   }
 
+  set {
+    name  = "txtPrefix"
+    value = "%%{record_type}-."
+  }
+
   # Include TXT so ExternalDNS can manage DNS ownership records.
 
   set {
