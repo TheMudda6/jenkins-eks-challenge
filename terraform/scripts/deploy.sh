@@ -649,7 +649,8 @@ while (( SECONDS < DNS_DEADLINE )); do
   ROUTE53_RECORDS="$(
     timeout 8s aws route53 list-resource-record-sets \
       --hosted-zone-id "$ROUTE53_ZONE_ID" \
-      --output json 2>/dev/null || echo '{"ResourceRecordSets":[]}'
+      --query "ResourceRecordSets[?Name==\`${JENKINS_HOST}.\` || Name==\`cname-.${JENKINS_HOST}.\` || Name==\`aaaa-.${JENKINS_HOST}.\`]" \
+      --output json 2>/dev/null || echo '[]'
   )"
 
   A_RECORD_VALID=false
@@ -660,7 +661,7 @@ while (( SECONDS < DNS_DEADLINE )); do
     --arg nlb "$TRAEFIK_NLB_HOST" \
     --argjson nlb_ips "$(printf '%s\n' "$NLB_IPS" | jq -Rsc 'split("\n") | map(select(length > 0))')" \
     '
-      any(.ResourceRecordSets[];
+      any(.[];
         .Name == $host and .Type == "A" and
         (
           (
@@ -685,7 +686,7 @@ while (( SECONDS < DNS_DEADLINE )); do
     --arg owner "external-dns/owner=jenkins-eks-challenge" \
     '
       def owned_txt($host):
-        any(.ResourceRecordSets[];
+        any(.[];
           .Name == $host and .Type == "TXT" and
           any((.ResourceRecords // [])[];
             (.Value | ltrimstr("\"") | rtrimstr("\"") | split(",")
