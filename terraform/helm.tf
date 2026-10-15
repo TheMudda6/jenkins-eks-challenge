@@ -167,6 +167,28 @@ resource "helm_release" "external_dns" {
     value = "jenkins-eks-challenge"
   }
 
+# Include TXT so ExternalDNS can manage DNS ownership records.
+
+  set {
+    name  = "managedRecordTypes[0]"
+    value = "A"
+  }
+
+  set {
+    name  = "managedRecordTypes[1]"
+    value = "AAAA"
+  }
+
+  set {
+    name  = "managedRecordTypes[2]"
+    value = "CNAME"
+  }
+
+  set {
+    name  = "managedRecordTypes[3]"
+    value = "TXT"
+  }
+
   set {
     name  = "domainFilters[0]"
     value = "jenkins.mud-as-sir.uk"

@@ -570,7 +570,6 @@ echo "✓ ExternalDNS is ready."
 
 print_banner "Verifying Public DNS"
 
-JENKINS_HOST="jenkins.mud-as-sir.uk"
 DNS_TIMEOUT_SECONDS=600
 DNS_POLL_SECONDS=10
 DNS_DEADLINE=$((SECONDS + DNS_TIMEOUT_SECONDS))
@@ -615,6 +614,9 @@ if [[ -z "$TRAEFIK_NLB_HOST" ]]; then
 fi
 
 TRAEFIK_NLB_HOST="${TRAEFIK_NLB_HOST%.}"
+
+JENKINS_HOST="jenkins.mud-as-sir.uk"
+
 echo "✓ Traefik NLB hostname: $TRAEFIK_NLB_HOST"
 
 DNS_READY=false
