@@ -442,10 +442,8 @@ if [[ -n "$ROUTE53_ZONE_ID" && "$ROUTE53_ZONE_ID" != "None" ]]; then
       --output json
   )"
 
-  # Only delete the project's ExternalDNS TXT ownership record.
-  # Do not delete A/AAAA aliases unless ownership can be established
-  # safely from the matching TXT record.
 
+  # Identify TXT records owned by this project's ExternalDNS registry.
   OWNED_TXT="$(
     jq -c --arg owner "jenkins-eks-challenge" '
       [
@@ -454,7 +452,8 @@ if [[ -n "$ROUTE53_ZONE_ID" && "$ROUTE53_ZONE_ID" != "None" ]]; then
           .Type == "TXT" and
           any((.ResourceRecords // [])[];
             (.Value | ltrimstr("\"") | rtrimstr("\"") | split(",")
-              | map(gsub("^\\s+|\\s+$"; "")) | index("external-dns/owner=" + $owner)) != null
+              | map(gsub("^\\s+|\\s+$"; ""))
+              | index("external-dns/owner=" + $owner)) != null
           )
         )
       ]
@@ -462,10 +461,11 @@ if [[ -n "$ROUTE53_ZONE_ID" && "$ROUTE53_ZONE_ID" != "None" ]]; then
   )"
 
 
-
-  if [[ "$ROUTE53_RECORDS" != "[]" ]]; then
+  # Delete only the project's ExternalDNS TXT ownership records.
+  # Preserve A/AAAA aliases and records without proven ownership.
+  if [[ "$OWNED_TXT" != "[]" ]]; then
     jq -n \
-      --argjson records "$ROUTE53_RECORDS" \
+      --argjson records "$OWNED_TXT" \
       '{Changes: [$records[] | {Action:"DELETE", ResourceRecordSet:.}]}' \
       > route53-destroy.json
 
@@ -474,14 +474,15 @@ if [[ -n "$ROUTE53_ZONE_ID" && "$ROUTE53_ZONE_ID" != "None" ]]; then
       --change-batch file://route53-destroy.json
 
     rm -f route53-destroy.json
-    echo "✓ Route53 A/AAAA/TXT records removed."
+    echo "✓ Project ExternalDNS TXT ownership records removed."
   else
-    echo "✓ No project DNS records found."
+    echo "✓ No project-owned TXT record found; DNS records preserved."
   fi
 
 else
   echo "✓ Project Route53 hosted zone not found."
 fi
+
 
 # ------------------------------------------------------------
 # Terraform destroy
