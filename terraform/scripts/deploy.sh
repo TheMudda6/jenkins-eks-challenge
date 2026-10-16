@@ -626,6 +626,8 @@ PUBLIC_IPS=''
 
 echo "Waiting for the Ingress, Route 53 records, and public DNS..."
 
+ROUTE53_QUERY_FAILED=false
+
 while (( SECONDS < DNS_DEADLINE )); do
   INGRESS_NLB_HOST="$(
     timeout 8s kubectl get ingress jenkins -n jenkins \
@@ -650,8 +652,11 @@ while (( SECONDS < DNS_DEADLINE )); do
     timeout 8s aws route53 list-resource-record-sets \
       --hosted-zone-id "$ROUTE53_ZONE_ID" \
       --query "ResourceRecordSets[?Name==\`${JENKINS_HOST}.\` || Name==\`cname-.${JENKINS_HOST}.\` || Name==\`aaaa-.${JENKINS_HOST}.\`]" \
-      --output json 2>/dev/null || echo '[]'
-  )"
+      --output json 2>/dev/null
+  )" || {
+    ROUTE53_QUERY_FAILED=true
+    ROUTE53_RECORDS='[]'
+  }
 
   A_RECORD_VALID=false
   TXT_RECORD_VALID=false
@@ -749,6 +754,7 @@ if [[ "$DNS_READY" != true ]]; then
   echo "Traefik NLB hostname: $TRAEFIK_NLB_HOST"
   echo "Ingress hostname: ${INGRESS_NLB_HOST:-not published}"
   echo "Route 53 A record valid: $A_RECORD_VALID"
+  echo "Route 53 query failed during polling: $ROUTE53_QUERY_FAILED"
   echo "Route 53 TXT ownership valid: $TXT_RECORD_VALID"
   echo "Public DNS overlaps current NLB IPs: $DNS_IP_OVERLAP"
   echo "HTTPS response status: ${HTTPS_STATUS:-unavailable}"
