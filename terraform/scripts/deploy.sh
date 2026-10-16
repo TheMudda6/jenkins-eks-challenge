@@ -266,10 +266,24 @@ echo "✓ AWS Load Balancer Controller is ready."
 
 echo "Waiting for AWS Load Balancer Controller webhook..."
 
+
+WEBHOOK_TIMEOUT_SECONDS=300
+WEBHOOK_DEADLINE=$((SECONDS + WEBHOOK_TIMEOUT_SECONDS))
+
 until kubectl get endpoints aws-load-balancer-webhook-service \
   -n kube-system \
   -o jsonpath='{.subsets[*].addresses[*].ip}' \
   2>/dev/null | grep -q '[0-9]'; do
+
+  if (( SECONDS >= WEBHOOK_DEADLINE )); then
+    echo "ERROR: AWS Load Balancer Controller webhook did not become ready within ${WEBHOOK_TIMEOUT_SECONDS}s."
+    run_diagnostic kubectl get endpoints \
+      aws-load-balancer-webhook-service -n kube-system -o yaml
+    run_diagnostic kubectl describe deployment \
+      aws-load-balancer-controller -n kube-system
+    exit 1
+  fi
+
   sleep 5
 done
 
@@ -282,6 +296,38 @@ kubectl wait \
   --timeout=300s
 
 echo "✓ EBS CSI controller is ready."
+
+# ------------------------------------------------------------
+# Verify cert-manager readiness before starting GitOps
+# ------------------------------------------------------------
+
+print_banner "Verifying cert-manager"
+
+kubectl wait \
+  --for=condition=Available \
+  deployment/cert-manager \
+  -n cert-manager \
+  --timeout=300s || {
+    echo "ERROR: cert-manager did not become Available within 300s."
+    run_diagnostic kubectl get pods -n cert-manager -o wide
+    run_diagnostic kubectl logs deployment/cert-manager -n cert-manager --tail=100
+    exit 1
+  }
+
+for crd in certificates.cert-manager.io clusterissuers.cert-manager.io; do
+  if ! kubectl wait \
+    --for=condition=Established \
+    "crd/${crd}" \
+    --timeout=300s; then
+    echo "ERROR: cert-manager CRD '${crd}' was not Established."
+    run_diagnostic kubectl get crd "$crd"
+    run_diagnostic kubectl get pods -n cert-manager -o wide
+    exit 1
+  fi
+done
+
+echo "✓ cert-manager deployment and required CRDs are ready."
+
 
 kubectl wait \
   --for=condition=Available \
@@ -570,9 +616,9 @@ echo "✓ ExternalDNS is ready."
 
 print_banner "Verifying Public DNS"
 
+NLB_TIMEOUT_SECONDS=300
 DNS_TIMEOUT_SECONDS=300
 DNS_POLL_SECONDS=10
-DNS_DEADLINE=$((SECONDS + DNS_TIMEOUT_SECONDS))
 TRAEFIK_NLB_HOST=""
 
 # Read the same literal hosted-zone ID Terraform uses from terraform.tfvars.
@@ -591,8 +637,9 @@ fi
 
 echo "Using configured Route 53 hosted zone: $ROUTE53_ZONE_ID"
 echo "Waiting for Traefik's Network Load Balancer hostname..."
+NLB_DEADLINE=$((SECONDS + NLB_TIMEOUT_SECONDS))
 
-while (( SECONDS < DNS_DEADLINE )); do
+while (( SECONDS < NLB_DEADLINE )); do
   TRAEFIK_NLB_HOST="$(
     timeout 8s kubectl get service traefik -n traefik \
       -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' \
@@ -607,7 +654,7 @@ while (( SECONDS < DNS_DEADLINE )); do
 done
 
 if [[ -z "$TRAEFIK_NLB_HOST" ]]; then
-  echo "ERROR: Traefik did not publish an NLB hostname within ${DNS_TIMEOUT_SECONDS}s."
+  echo "ERROR: Traefik did not publish an NLB hostname within ${NLB_TIMEOUT_SECONDS}s."
   run_diagnostic kubectl get service traefik -n traefik -o wide
   run_diagnostic kubectl describe service traefik -n traefik
   exit 1
@@ -618,6 +665,8 @@ TRAEFIK_NLB_HOST="${TRAEFIK_NLB_HOST%.}"
 JENKINS_HOST="jenkins.mud-as-sir.uk"
 
 echo "✓ Traefik NLB hostname: $TRAEFIK_NLB_HOST"
+
+DNS_DEADLINE=$((SECONDS + DNS_TIMEOUT_SECONDS))
 
 DNS_READY=false
 ROUTE53_RECORDS='[]'
@@ -651,7 +700,7 @@ while (( SECONDS < DNS_DEADLINE )); do
   ROUTE53_RECORDS="$(
     timeout 8s aws route53 list-resource-record-sets \
       --hosted-zone-id "$ROUTE53_ZONE_ID" \
-      --query "ResourceRecordSets[?Name==\`${JENKINS_HOST}.\` || Name==\`a-.${JENKINS_HOST}.\`]" \
+      --query "ResourceRecordSets[?Name==\`${JENKINS_HOST}.\` || Name==\`aaaa-.${JENKINS_HOST}.\`]" \
       --output json 2>/dev/null
   )" || {
     ROUTE53_QUERY_FAILED=true
@@ -686,7 +735,7 @@ while (( SECONDS < DNS_DEADLINE )); do
   fi
 
    if printf '%s' "$ROUTE53_RECORDS" | jq -e \
-    --arg a_host "a-.${JENKINS_HOST}." \
+    --arg a_host "aaaa-.${JENKINS_HOST}." \
     --arg owner "external-dns/owner=jenkins-eks-challenge" \
     '
       any(.[];

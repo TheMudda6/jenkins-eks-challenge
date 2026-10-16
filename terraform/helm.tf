@@ -217,6 +217,7 @@ resource "helm_release" "external_dns" {
   depends_on = [
     module.eks,
     module.iam,
+    null_resource.aws_load_balancer_webhook_ready,
   ]
 }
 
