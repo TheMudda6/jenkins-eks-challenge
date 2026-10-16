@@ -654,7 +654,6 @@ while (( SECONDS < DNS_DEADLINE )); do
   )"
 
   A_RECORD_VALID=false
-  AAAA_RECORD_VALID=false
   TXT_RECORD_VALID=false
 
   if printf '%s' "$ROUTE53_RECORDS" | jq -e \
@@ -679,24 +678,6 @@ while (( SECONDS < DNS_DEADLINE )); do
       )
     ' >/dev/null 2>&1; then
     A_RECORD_VALID=true
-  fi
-
-  if printf '%s' "$ROUTE53_RECORDS" | jq -e \
-    --arg host "${JENKINS_HOST}." \
-    --arg nlb "$TRAEFIK_NLB_HOST" \
-    '
-      any(.[];
-        .Name == $host and .Type == "AAAA" and
-        (
-          ((.AliasTarget.DNSName // "") | ascii_downcase
-            | sub("\\.$"; "") | sub("^dualstack\\."; ""))
-          ==
-          ($nlb | ascii_downcase
-            | sub("\\.$"; "") | sub("^dualstack\\."; ""))
-        )
-      )
-    ' >/dev/null 2>&1; then
-    AAAA_RECORD_VALID=true
   fi
 
   if printf '%s' "$ROUTE53_RECORDS" | jq -e \
@@ -738,7 +719,6 @@ while (( SECONDS < DNS_DEADLINE )); do
 
   if [[ "$INGRESS_NLB_HOST" == "$TRAEFIK_NLB_HOST" ]] \
     && [[ "$A_RECORD_VALID" == true ]] \
-    && [[ "$AAAA_RECORD_VALID" == true ]] \
     && [[ "$TXT_RECORD_VALID" == true ]] \
     && [[ "$DNS_IP_OVERLAP" == true ]]; then
     if HTTPS_STATUS="$(
@@ -769,7 +749,6 @@ if [[ "$DNS_READY" != true ]]; then
   echo "Traefik NLB hostname: $TRAEFIK_NLB_HOST"
   echo "Ingress hostname: ${INGRESS_NLB_HOST:-not published}"
   echo "Route 53 A record valid: $A_RECORD_VALID"
-  echo "Route 53 AAAA record valid: $AAAA_RECORD_VALID"
   echo "Route 53 TXT ownership valid: $TXT_RECORD_VALID"
   echo "Public DNS overlaps current NLB IPs: $DNS_IP_OVERLAP"
   echo "HTTPS response status: ${HTTPS_STATUS:-unavailable}"
@@ -796,7 +775,7 @@ if [[ "$DNS_READY" != true ]]; then
   exit 1
 fi
 
-echo "✓ Route 53 A and AAAA aliases target the current Traefik NLB."
+echo "✓ Route 53 A record targets the current Traefik NLB."
 echo "✓ ExternalDNS TXT ownership record is present."
 echo "✓ Public DNS resolves to a current Traefik NLB address."
 echo "✓ HTTPS responded successfully (HTTP ${HTTPS_STATUS})."
