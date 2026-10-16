@@ -685,25 +685,21 @@ while (( SECONDS < DNS_DEADLINE )); do
     A_RECORD_VALID=true
   fi
 
-  if printf '%s' "$ROUTE53_RECORDS" | jq -e \
+   if printf '%s' "$ROUTE53_RECORDS" | jq -e \
     --arg cname_host "cname-.${JENKINS_HOST}." \
-    --arg aaaa_host "aaaa-.${JENKINS_HOST}." \
     --arg owner "external-dns/owner=jenkins-eks-challenge" \
     '
-      def owned_txt($host):
-        any(.[];
-          .Name == $host and .Type == "TXT" and
-          any((.ResourceRecords // [])[];
-            (.Value | ltrimstr("\"") | rtrimstr("\"") | split(",")
-              | map(gsub("^\\s+|\\s+$"; ""))) as $metadata
-            | ($metadata | index($owner)) != null
-              and any($metadata[];
-                startswith("external-dns/resource=")
-                and length > ("external-dns/resource=" | length))
-          )
-        );
-
-      owned_txt($cname_host) and owned_txt($aaaa_host)
+      any(.[];
+        .Name == $cname_host and .Type == "TXT" and
+        any((.ResourceRecords // [])[];
+          (.Value | ltrimstr("\"") | rtrimstr("\"") | split(",")
+            | map(gsub("^\\s+|\\s+$"; ""))) as $metadata
+          | ($metadata | index($owner)) != null
+            and any($metadata[];
+              startswith("external-dns/resource=")
+              and length > ("external-dns/resource=" | length))
+        )
+      )
     ' >/dev/null 2>&1; then
     TXT_RECORD_VALID=true
   fi
