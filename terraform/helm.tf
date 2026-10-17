@@ -172,8 +172,7 @@ resource "helm_release" "external_dns" {
     value = "%%{record_type}-."
   }
 
-  # Include TXT so ExternalDNS can manage DNS ownership records.
-
+  # Manage IPv4 aliases and TXT ownership records only.
   set {
     name  = "managedRecordTypes[0]"
     value = "A"
@@ -181,16 +180,6 @@ resource "helm_release" "external_dns" {
 
   set {
     name  = "managedRecordTypes[1]"
-    value = "AAAA"
-  }
-
-  set {
-    name  = "managedRecordTypes[2]"
-    value = "CNAME"
-  }
-
-  set {
-    name  = "managedRecordTypes[3]"
     value = "TXT"
   }
 
