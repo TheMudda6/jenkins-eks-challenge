@@ -700,7 +700,7 @@ while (( SECONDS < DNS_DEADLINE )); do
   ROUTE53_RECORDS="$(
     timeout 8s aws route53 list-resource-record-sets \
       --hosted-zone-id "$ROUTE53_ZONE_ID" \
-      --query "ResourceRecordSets[?Name==\`${JENKINS_HOST}.\` || Name==\`aaaa-.${JENKINS_HOST}.\`]" \
+      --query "ResourceRecordSets[?Name==\`${JENKINS_HOST}.\` || Name==\`cname-.${JENKINS_HOST}.\`]" \
       --output json 2>/dev/null
   )" || {
     ROUTE53_QUERY_FAILED=true
@@ -735,7 +735,7 @@ while (( SECONDS < DNS_DEADLINE )); do
   fi
 
    if printf '%s' "$ROUTE53_RECORDS" | jq -e \
-    --arg a_host "aaaa-.${JENKINS_HOST}." \
+    --arg a_host "cname-.${JENKINS_HOST}." \
     --arg owner "external-dns/owner=jenkins-eks-challenge" \
     '
       any(.[];
