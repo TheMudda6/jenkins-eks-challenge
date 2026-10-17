@@ -152,6 +152,12 @@ resource "helm_release" "external_dns" {
     value = "aws"
   }
 
+  # Temporary DNS troubleshooting: expose ExternalDNS reconciliation details.
+  set {
+    name  = "logLevel"
+    value = "debug"
+  }
+
   set {
     name  = "policy"
     value = "sync"
