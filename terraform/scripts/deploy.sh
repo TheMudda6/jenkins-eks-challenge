@@ -782,8 +782,7 @@ if [[ "$INGRESS_NLB_HOST" == "$TRAEFIK_NLB_HOST" ]] \
     else
       HTTPS_CURL_EXIT=$?
     fi
-
-    if [[ "$HTTPS_CURL_EXIT" -eq 0 ]] \
+q
       && [[ "$HTTPS_STATUS" =~ ^[0-9]{3}$ ]] \
       && (( 10#$HTTPS_STATUS >= 200 && 10#$HTTPS_STATUS < 400 )); then
       HTTPS_READY=true
