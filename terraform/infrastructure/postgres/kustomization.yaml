@@ -9,5 +9,7 @@
 # -----------------------------------------------------------------------------
 
 resources:
+  - postgres-pv.yaml
+  - postgres-pvc.yaml
   - postgres-service.yaml
   - postgres-statefulset.yaml

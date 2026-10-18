@@ -1,0 +1,42 @@
+
+# -----------------------------------------------------------------------------
+# PostgreSQL PersistentVolume
+#
+# Purpose:
+# Reuses the existing 20 GiB EBS volume for PostgreSQL across deployments.
+# The EBS volume is retained when its Kubernetes claim is released.
+#
+# Primary EBS volume: vol-0bf5bff9e58cc11fb
+# Availability Zone: eu-west-2b
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-data-pv
+spec:
+  capacity:
+    storage: 20Gi
+
+  volumeMode: Filesystem
+
+  accessModes:
+    - ReadWriteOnce
+
+  persistentVolumeReclaimPolicy: Retain
+
+  storageClassName: ""
+
+  csi:
+    driver: ebs.csi.aws.com
+    volumeHandle: vol-0bf5bff9e58cc11fb
+    fsType: ext4
+
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: topology.kubernetes.io/zone
+              operator: In
+              values:
+                - eu-west-2b

@@ -37,7 +37,12 @@ spec:
         app: postgres
 
     spec:
-      containers:
+       volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data-postgres-0
+
+    containers:
 
         - name: postgres
           image: postgres:16.9
@@ -70,19 +75,3 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
-
-  volumeClaimTemplates:
-
-    - metadata:
-        name: postgres-data
-
-      spec:
-
-        accessModes:
-          - ReadWriteOnce
-
-        storageClassName: gp3-retain
-
-        resources:
-          requests:
-            storage: 20Gi    

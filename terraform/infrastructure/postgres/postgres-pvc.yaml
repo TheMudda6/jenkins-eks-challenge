@@ -1,0 +1,25 @@
+
+# -----------------------------------------------------------------------------
+# PostgreSQL PersistentVolumeClaim
+#
+# Purpose:
+# Binds PostgreSQL to the pre-provisioned EBS PersistentVolume.
+# The fixed claim name preserves the StatefulSet's existing volume identity.
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data-postgres-0
+  namespace: jenkins
+spec:
+  accessModes:
+    - ReadWriteOnce
+
+  storageClassName: ""
+
+  volumeName: postgres-data-pv
+
+  resources:
+    requests:
+      storage: 20Gi
