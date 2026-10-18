@@ -773,7 +773,7 @@ if [[ "$INGRESS_NLB_HOST" == "$TRAEFIK_NLB_HOST" ]] \
   && [[ "$A_RECORD_VALID" == true ]] \
   && [[ "$TXT_RECORD_VALID" == true ]]; then
     if HTTPS_STATUS="$(
-      timeout 12s curl --silent --show-error --output /dev/null \
+      timeout 12s curl -4 --silent --show-error --output /dev/null \
         --connect-timeout 5 --max-time 10 \
         --write-out '%{http_code}' "https://${JENKINS_HOST}/" \
         2>/dev/null
