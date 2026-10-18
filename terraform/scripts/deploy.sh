@@ -697,6 +697,8 @@ while (( SECONDS < DNS_DEADLINE )); do
       | sort -u || true
   )"
 
+  ROUTE53_QUERY_FAILED=false
+
   ROUTE53_RECORDS="$(
     timeout 8s aws route53 list-resource-record-sets \
       --hosted-zone-id "$ROUTE53_ZONE_ID" \
@@ -767,10 +769,9 @@ while (( SECONDS < DNS_DEADLINE )); do
   HTTPS_CURL_EXIT="not_attempted"
   HTTPS_READY=false
 
-  if [[ "$INGRESS_NLB_HOST" == "$TRAEFIK_NLB_HOST" ]] \
-    && [[ "$A_RECORD_VALID" == true ]] \
-    && [[ "$TXT_RECORD_VALID" == true ]] \
-    && [[ "$DNS_IP_OVERLAP" == true ]]; then
+if [[ "$INGRESS_NLB_HOST" == "$TRAEFIK_NLB_HOST" ]] \
+  && [[ "$A_RECORD_VALID" == true ]] \
+  && [[ "$TXT_RECORD_VALID" == true ]]; then
     if HTTPS_STATUS="$(
       timeout 12s curl --silent --show-error --output /dev/null \
         --connect-timeout 5 --max-time 10 \
