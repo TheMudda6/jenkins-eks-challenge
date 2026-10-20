@@ -13,12 +13,6 @@
 
 apiVersion: apps/v1
 kind: StatefulSet
-
-# -----------------------------------------------------------------------------
-# Uses the PostgreSQL Headless Service to provide each StatefulSet Pod
-# with a stable DNS name and network identity.
-# -----------------------------------------------------------------------------
-
 metadata:
   name: postgres
   namespace: jenkins
@@ -37,13 +31,12 @@ spec:
         app: postgres
 
     spec:
-       volumes:
+      volumes:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: postgres-data-postgres-0
 
-    containers:
-
+      containers:
         - name: postgres
           image: postgres:16.9
           ports:
