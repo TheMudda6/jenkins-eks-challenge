@@ -769,9 +769,10 @@ while (( SECONDS < DNS_DEADLINE )); do
   HTTPS_CURL_EXIT="not_attempted"
   HTTPS_READY=false
 
-if [[ "$INGRESS_NLB_HOST" == "$TRAEFIK_NLB_HOST" ]] \
-  && [[ "$A_RECORD_VALID" == true ]] \
-  && [[ "$TXT_RECORD_VALID" == true ]]; then
+  if [[ "$INGRESS_NLB_HOST" == "$TRAEFIK_NLB_HOST" ]] \
+    && [[ "$A_RECORD_VALID" == true ]] \
+    && [[ "$TXT_RECORD_VALID" == true ]]; then
+
     if HTTPS_STATUS="$(
       timeout 12s curl -4 --silent --show-error --output /dev/null \
         --connect-timeout 5 --max-time 10 \
@@ -782,8 +783,8 @@ if [[ "$INGRESS_NLB_HOST" == "$TRAEFIK_NLB_HOST" ]] \
     else
       HTTPS_CURL_EXIT=$?
     fi
-q
-      && [[ "$HTTPS_STATUS" =~ ^[0-9]{3}$ ]] \
+
+    if [[ "$HTTPS_STATUS" =~ ^[0-9]{3}$ ]] \
       && (( 10#$HTTPS_STATUS >= 200 && 10#$HTTPS_STATUS < 400 )); then
       HTTPS_READY=true
       DNS_READY=true
