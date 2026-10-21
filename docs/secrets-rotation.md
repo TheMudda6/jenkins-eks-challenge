@@ -46,11 +46,9 @@ During live deployment validation, an External Secrets IRSA lifecycle issue was 
 
 A newly created test pod using the External Secrets ServiceAccount received:
 
-```text
 AWS_ROLE_ARN
 AWS_WEB_IDENTITY_TOKEN_FILE
 aws-iam-token
-```
 
 This confirmed that the IRSA webhook was correctly injecting the AWS identity information into newly created pods.
 

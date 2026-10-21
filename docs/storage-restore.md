@@ -20,12 +20,10 @@ PostgreSQL uses a `20Gi` persistent volume with the `gp3-retain` StorageClass.
 
 PostgreSQL is deployed as a StatefulSet using:
 
-```text
 PostgreSQL 16.9
 20Gi PVC
 gp3-retain
 PGDATA=/var/lib/postgresql/data/pgdata
-```
 
 The `Retain` reclaim policy is intentional for the PostgreSQL data volume.
 
@@ -37,7 +35,6 @@ The project contains Kubernetes manifests for PostgreSQL snapshot and restore op
 
 The recovery workflow is:
 
-```text
 Running PostgreSQL
         |
         v
@@ -54,7 +51,6 @@ PostgreSQL StatefulSet
         |
         v
 Validate restored data
-```
 
 The snapshot and restore resources are managed as Kubernetes manifests so that the recovery process is repeatable.
 
@@ -78,7 +74,6 @@ Retained volumes should be reviewed before deleting them because they may contai
 
 The recovery process is based on:
 
-```text
 Snapshot
    |
    v
@@ -89,6 +84,5 @@ Validate
    |
    v
 Return workload to service
-```
 
 The restore procedure should be tested periodically rather than assuming that the existence of a snapshot alone guarantees recovery.

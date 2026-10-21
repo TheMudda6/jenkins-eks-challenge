@@ -1,45 +1,43 @@
 # Kubernetes E-Commerce Platform on Amazon EKS
 
-A production-inspired Kubernetes e-commerce platform built on **Amazon EKS**, using Terraform, Kubernetes, Kustomize, ArgoCD, GitHub Actions, AWS managed services, and a full observability stack.
+A production-inspired, cloud-native e-commerce platform built on **Amazon EKS**, using Terraform, Kubernetes, Go, Docker, Kustomize, Argo CD, GitHub Actions, AWS managed services, and an observability stack.
 
-This project evolved from an earlier Jenkins-on-EKS deployment into a complete nine-service Kubernetes platform based on **The K8s Project (v2 Edition) – E-Commerce Platform**.
+This project evolved from an earlier Jenkins-on-EKS deployment into a nine-service Kubernetes platform based on **The K8s Project (v2 Edition) – E-Commerce Platform**.
 
-The goal was not simply to deploy an application, but to build, automate, validate, break, troubleshoot, and document a realistic cloud-native platform from infrastructure creation through application delivery and destruction.
+The goal was not simply to deploy an application. It was to build, automate, validate, troubleshoot, document, and manage the lifecycle of a cloud-native platform, from infrastructure provisioning through application delivery and infrastructure destruction.
+
+The platform was previously deployed to EKS for live validation and subsequently destroyed to avoid unnecessary AWS costs. The repository documents the implementation; it does not imply that the environment is currently running.
 
 ---
 
-## Project Overview
+## Project overview
 
-The platform demonstrates:
+The project brings together infrastructure provisioning, application delivery, persistent data, asynchronous messaging, GitOps, and monitoring.
 
 - Infrastructure as Code with Terraform
-- Amazon EKS 1.33
-- Multi-AZ networking
-- Karpenter node provisioning
-- AWS EBS CSI storage
-- Persistent PostgreSQL and Redis
-- AWS Secrets Manager with External Secrets
-- Amazon SQS with a Dead Letter Queue
+- Amazon EKS 1.33 and Kubernetes
+- VPC networking with public and private subnets
+- Karpenter components for node provisioning
+- Amazon ECR container repositories
+- PostgreSQL and Redis
+- Amazon EBS CSI storage and snapshot/restore resources
+- AWS Secrets Manager and External Secrets
+- Amazon SQS with a dead-letter queue
 - Traefik ingress behind an AWS Network Load Balancer
-- TLS with cert-manager and Let's Encrypt
-- Route53 DNS automation
-- ArgoCD GitOps
+- TLS configuration with cert-manager and Let's Encrypt
+- Route 53 DNS and Cloudflare delegation
+- Argo CD App-of-Apps GitOps
 - Kustomize development and production overlays
-- Prometheus and Grafana observability
-- GitHub Actions CI/CD
-- GitHub Actions OIDC authentication
-- Container image security scanning
+- Prometheus and Grafana monitoring configuration
+- GitHub Actions CI/CD and OIDC authentication
+- Container image scanning and immutable image tags
 - Horizontal Pod Autoscaling
-- Snapshot and restore workflows
-- Automated infrastructure destruction and cleanup
+- Deployment, validation, and destruction automation
 
-The project was deployed to EKS for live validation and was subsequently destroyed to avoid unnecessary AWS costs.
+## Architecture
 
----
+### Application traffic and data flow
 
-# Architecture
-
-```text
                          Internet
                             |
                             v
@@ -47,8 +45,6 @@ The project was deployed to EKS for live validation and was subsequently destroy
                             |
                             v
                        Traefik Ingress
-                            |
-                    HTTPS / TLS termination
                             |
                             v
                      api-gateway :8080
@@ -58,248 +54,226 @@ The project was deployed to EKS for live validation and was subsequently destroy
           v                 v                  v
    order-service     inventory-service    payment-service
        :8081              :8082               :8083
-          |
-          +------------------+
-          |                  |
-          v                  v
- notification-service   shipping-service
-       :8084                 :8085
-          |
-          +------------------+
-          |
-          v
-     worker :8090
-     scheduler :8091
-     dashboard-api :8086
 
-          |
-          +--------------------+
-          |                    |
-          v                    v
-     PostgreSQL              Redis
-       20Gi                   10Gi
+   Additional application services:
+   notification-service :8084
+   shipping-service     :8085
+   dashboard-api       :8086
+   worker              :8090
+   scheduler           :8091
+
+          +-------------------------+
+          |                         |
+          v                         v
+      PostgreSQL                  Redis
           |
           v
-     AWS EBS gp3
+      AWS EBS storage
 
-order-service / payment-service / shipping-service
-                    |
-                    v
-              Amazon SQS
-                    |
-                    v
-               Worker
-                    |
-                    v
-                DLQ
+ order-service / payment-service / shipping-service
+                            |
+                            v
+                       Amazon SQS
+                            |
+                            v
+                          Worker
+                            |
+                            v
+                    Dead-letter queue
 
-                    AWS
-                     |
-       +-------------+-------------+
-       |             |             |
-       v             v             v
-  Secrets Manager   ECR          Route53
-       |                           |
-       v                           v
-External Secrets              DNS records
+This is a conceptual overview of the architecture and intended integrations, not a verified trace of every application request or event.
 
-                     |
-                     v
-                  ArgoCD
-                     |
-        +------------+-------------+
-        |            |             |
-        v            v             v
-       Dev          Prod       Platform Apps
+### Infrastructure and delivery
 
-                     |
-                     v
-              Prometheus
-                     |
-                     v
-                  Grafana
-```
+Terraform
+    |
+    +---- VPC and AWS infrastructure
+    |
+    +---- EKS and selected platform Helm releases
+    |
+    +---- ECR, SQS, IAM, KMS and Secrets Manager
+    |
+    v
+  Amazon EKS <---------------- GitHub Actions
+    |                              |
+    |                              v
+    |                         Build and publish
+    |                         service images
+    |
+    v
+  Argo CD <---------------- Git repository
+    |
+    +---- Application overlays
+    +---- PostgreSQL and Redis
+    +---- Storage and secrets configuration
+    +---- Monitoring and platform resources
+
+Terraform provisions cloud infrastructure and selected platform components. Argo CD reconciles Kubernetes resources from Git, while Kubernetes controllers manage resources within their respective responsibilities. Some supporting resources are handled by dedicated scripts and controllers.
 
 ---
 
-# Application Services
+## Application services
 
-The application consists of the nine services defined by the project architecture.
+The application consists of nine independently containerized Go services.
 
 | Service | Port | Purpose |
 |---|---:|---|
-| `api-gateway` | 8080 | Entry point for application requests |
-| `order-service` | 8081 | Order processing |
-| `inventory-service` | 8082 | Inventory management |
-| `payment-service` | 8083 | Payment processing |
-| `notification-service` | 8084 | Notifications |
-| `shipping-service` | 8085 | Shipping operations |
-| `worker` | 8090 | Background event processing |
-| `scheduler` | 8091 | Scheduled background processing |
-| `dashboard-api` | 8086 | Dashboard/API functionality |
+| `api-gateway` | 8080 | Entry point for application requests and backend routing |
+| `order-service` | 8081 | Order operations and order-event publishing |
+| `inventory-service` | 8082 | Product and inventory reservation operations |
+| `payment-service` | 8083 | Payment operations and event publishing |
+| `notification-service` | 8084 | Notification templates and history |
+| `shipping-service` | 8085 | Shipment operations and carrier webhook |
+| `worker` | 8090 | SQS message consumption |
+| `scheduler` | 8091 | Scheduled background jobs |
+| `dashboard-api` | 8086 | Dashboard data and static dashboard content |
 
-Each service is deployed using:
+The service configuration includes Kubernetes Deployments and Services, resource requests and limits, readiness and liveness probes, dedicated ServiceAccounts, and multi-stage Docker builds. Horizontal Pod Autoscaling is configured for HTTP-facing services.
 
-- Kubernetes Deployment
-- ClusterIP Service
-- Resource requests and limits
-- Liveness probes
-- Readiness probes
-- Dedicated ServiceAccount
-- Container security settings
-- Multi-stage Docker builds
-- ECR images tagged with the Git commit SHA
-
-Request-path services also use Horizontal Pod Autoscaling.
+The reviewed Kubernetes configuration uses fixed two-replica Deployments for the worker and scheduler. The repository defines the intended service integrations; source configuration alone does not establish that every integration is operational end to end.
 
 ---
 
-# Infrastructure
+## Technology stack
 
-Infrastructure is managed entirely through Terraform.
+| Category | Technologies |
+|---|---|
+| Cloud | AWS |
+| Infrastructure as Code | Terraform |
+| Container orchestration | Amazon EKS, Kubernetes |
+| Application | Go, Docker |
+| Networking | Amazon VPC, routing, NAT Gateway |
+| Container registry | Amazon ECR |
+| Identity | AWS IAM, IRSA, GitHub Actions OIDC |
+| Encryption | AWS KMS |
+| Messaging | Amazon SQS and dead-letter queue |
+| Data | PostgreSQL, Redis |
+| Storage | Amazon EBS, EBS CSI, gp3 StorageClasses |
+| Ingress | Traefik, AWS Load Balancer Controller, NLB |
+| TLS and DNS | cert-manager, Let's Encrypt, Route 53, Cloudflare |
+| GitOps | Argo CD, Kustomize |
+| Observability | Prometheus, Grafana |
+| CI/CD | GitHub Actions |
+| Automation | Bash, Terraform |
+| Version control | Git, GitHub |
 
-## AWS Infrastructure
+---
 
-The platform provisions:
+## Infrastructure as Code
 
-- VPC
-- Public and private subnets
-- Multi-AZ networking
-- Internet Gateway
-- NAT Gateway infrastructure
+Terraform is organized into reusable modules and separate roots for the main platform, bootstrap resources, and DNS.
+
+### Main infrastructure
+
+The main Terraform configuration covers:
+
+- VPC, public and private subnets, routing, and NAT
 - VPC Flow Logs
-- Amazon EKS
-- EKS managed components
-- Karpenter
-- IAM roles
-- KMS encryption
-- Amazon ECR
-- Amazon SQS
-- AWS Secrets Manager integration
-- Route53 integration
+- Amazon EKS and managed node group
+- IAM roles and policies
+- KMS encryption keys
+- Amazon ECR repositories
+- Amazon SQS queue and dead-letter queue
+- AWS Secrets Manager resources
+- EKS add-ons and supporting platform components
+- Selected Helm releases
 
-The EKS cluster uses:
+### Terraform modules
 
-- Kubernetes 1.33
-- Control-plane logging
-- KMS secrets encryption
-- EKS access entries
-- EBS CSI
-- VPC CNI network policy support
+| Module | Responsibility |
+|---|---|
+| `vpc` | Networking, routing, NAT, and flow logging |
+| `eks` | EKS cluster and supporting configuration |
+| `iam` | Infrastructure and workload identity |
+| `kms` | Customer-managed encryption keys |
+| `ecr` | Container image repositories |
+| `sqs` | Orders queue and dead-letter queue |
+| `secrets` | Secrets Manager resources |
+| `argocd` | Argo CD installation |
+| `karpenter` | Karpenter controller and supporting resources |
 
----
+### Networking
 
-# Terraform State
+The VPC module defines public and private subnets with separate route tables.
 
-Terraform uses remote state stored in Amazon S3.
+- Public subnets route through an Internet Gateway.
+- Private subnets use a NAT Gateway for outbound internet connectivity.
+- VPC Flow Logs capture accepted and rejected traffic.
+- Private subnet tags support Karpenter discovery.
 
-```text
-S3 Bucket:
-mudassir-tf-state-893061519920
+The configuration uses a single NAT Gateway as a cost-saving trade-off for this portfolio environment.
 
-Platform State:
-jenkins/terraform.tfstate
+### Terraform state and ownership
 
-Bootstrap State:
-bootstrap/terraform.tfstate
-```
+Terraform uses remote state in Amazon S3 with native lockfile-based state locking. The repository has separate Terraform roots for:
 
-Native S3 lockfile-based state locking is enabled.
+| Root | Purpose |
+|---|---|
+| `terraform/` | Main infrastructure and selected platform Helm releases |
+| `bootstrap/` | Initial state-backend infrastructure and GitHub Actions Terraform role |
+| `terraform/dns/` | Route 53 hosted zone and Cloudflare delegation configuration |
 
-This keeps Terraform state outside the local machine and allows CI/CD to operate against the same remote state.
+The DNS root uses separate state and is not automatically applied by the main platform deployment script.
 
----
-
-# Karpenter
-
-Karpenter is used for Kubernetes node provisioning.
-
-The project includes:
-
-- Karpenter controller
-- IAM permissions
-- EC2NodeClass
-- NodePool
-- Required subnet and security-group discovery tags
-
-This allows Kubernetes workloads to trigger dynamic node provisioning instead of relying entirely on statically defined worker nodes.
+For detailed infrastructure architecture, module responsibilities, and Terraform workflows, see [`terraform/README.md`](terraform/README.md).
 
 ---
 
-# Storage
+## Karpenter
 
-Persistent storage is provided through the AWS EBS CSI driver.
+The repository includes the Karpenter controller, supporting IAM configuration, and `NodePool` and `EC2NodeClass` manifests.
 
-The project includes:
-
-- EBS CSI EKS add-on
-- IAM permissions for EBS CSI
-- IRSA
-- `gp3` StorageClass
-- `gp3-retain` StorageClass
-- VolumeSnapshotClass
-
-## Storage Classes
-
-```text
-gp3
-├── ReclaimPolicy: Delete
-└── Used for normal persistent workloads
-
-gp3-retain
-├── ReclaimPolicy: Retain
-└── Used for PostgreSQL
-```
-
-PostgreSQL uses `gp3-retain` so that the underlying persistent volume is not automatically deleted when the Kubernetes claim is removed.
-
-This also introduced an important operational lesson: retained EBS volumes can survive cluster destruction and must be deliberately accounted for during cleanup.
+However, the source review did not establish that those custom resources are wired into the active reconciliation path. Dynamic node provisioning should therefore be treated as an intended capability until the manifest ownership and live provisioning behaviour are verified.
 
 ---
 
-# PostgreSQL
+## Storage and stateful services
 
-PostgreSQL runs inside the Kubernetes cluster as a StatefulSet.
+### PostgreSQL
 
-Configuration includes:
+PostgreSQL runs as a single-replica StatefulSet. The reviewed configuration includes:
 
 - PostgreSQL 16.9
-- 1 replica
-- 20Gi persistent volume
-- `gp3-retain`
-- Persistent `PGDATA`
-- Kubernetes Secret generated through External Secrets
-- Liveness/readiness checks
+- A 20 GiB persistent volume
+- The `gp3-retain` StorageClass
+- Persistent `PGDATA` configuration
+- Kubernetes Secret integration through External Secrets
+- Readiness and liveness checks
 
-The PostgreSQL storage lifecycle was tested using Kubernetes snapshot and restore workflows.
+### Redis
 
----
-
-# Redis
-
-Redis runs as a StatefulSet with persistent storage.
-
-Configuration includes:
+Redis runs as a single replica with persistent storage. The configuration includes:
 
 - Redis 8.2
-- 1 replica
-- 10Gi persistent volume
-- `gp3`
+- A 10 GiB persistent volume
+- The `gp3` StorageClass
 - Append-only file persistence
-- Password authentication
-- Readiness/liveness checks
+- Readiness and liveness checks
 
-Redis is used as the platform's stateful caching/data component.
+### Storage classes and recovery
+
+The platform defines two StorageClasses:
+
+gp3
+  ReclaimPolicy: Delete
+  Intended for ordinary persistent workloads
+
+gp3-retain
+  ReclaimPolicy: Retain
+  Used for PostgreSQL storage
+
+Retained EBS volumes can survive Kubernetes or EKS destruction. They must be deliberately accounted for during cleanup.
+
+The repository includes a VolumeSnapshotClass, PostgreSQL snapshot/restore manifests, and a documented restoration procedure in [`docs/storage-restore.md`](docs/storage-restore.md).
+
+The manifests and documentation describe the intended recovery workflow. They do not, by themselves, establish current snapshot availability, restored-data integrity, or measured recovery time and recovery-point objectives.
 
 ---
 
-# Secrets Management
+## Secrets management
 
-Application secrets are not stored directly in Git.
+The intended application secret flow is:
 
-The platform uses:
-
-```text
 AWS Secrets Manager
         |
         v
@@ -310,69 +284,62 @@ Kubernetes Secret
         |
         v
 Application
-```
 
-External Secrets uses:
+The platform uses IAM, IRSA, AWS Secrets Manager, and KMS permissions to integrate secrets with Kubernetes workloads.
 
-- IAM
-- IRSA
-- AWS Secrets Manager
-- KMS permissions
+See [`docs/secrets-rotation.md`](docs/secrets-rotation.md) for the documented secret synchronization and rotation workflow.
 
-The External Secrets IAM policy is restricted to the required Secrets Manager and KMS operations.
+### Troubleshooting example: External Secrets and IRSA
 
-For the documented secret rotation procedure, see [Secrets Rotation](docs/secrets-rotation.md).
+During deployment validation, PostgreSQL and application pods encountered `CreateContainerConfigError` while the External Secrets controller was unable to decrypt a required secret.
 
-During deployment validation, an IRSA lifecycle issue was discovered where an existing External Secrets controller pod had been created before the required IAM mutation was available.
+The investigation compared the existing controller pod with a newly created test pod using the same ServiceAccount. The test pod received the expected web identity environment and projected token configuration:
 
-The issue was diagnosed by comparing the existing controller pod with a newly created test pod and confirming the presence of:
-
-```text
 AWS_ROLE_ARN
 AWS_WEB_IDENTITY_TOKEN_FILE
 aws-iam-token
-```
 
-The permanent Terraform configuration was then updated so the External Secrets IAM role has permission to decrypt the specific KMS key used by the secrets.
+This helped isolate the problem to the lifecycle of the existing controller pod and the timing of the IAM configuration change.
+
+The controller was restarted and the Terraform-managed IAM configuration was updated to include the required KMS decrypt permission for the relevant key. Subsequent validation reported the ExternalSecret as synchronized and PostgreSQL as ready.
+
+This is a documented troubleshooting outcome from the earlier deployment, not a claim about current runtime state.
 
 ---
 
-# Event Bus
+## Event bus
 
-The application uses Amazon SQS for asynchronous event processing.
+Amazon SQS provides the platform's asynchronous messaging resources.
 
-The platform includes:
-
-```text
+Producers
+   |
+   v
 orders queue
-     |
-     v
+   |
+   v
 worker
-     |
-     v
-orders DLQ
-```
+   |
+   v
+orders dead-letter queue
 
-Configuration includes:
+The reviewed queue configuration includes:
 
-- 30 second visibility timeout
-- 4 day message retention
-- 20 second long polling
-- Dead Letter Queue
-- 14 day DLQ retention
-- Maximum receive count of 5
+- 30-second visibility timeout
+- Four-day message retention
+- 20-second long polling
+- A dead-letter queue with 14-day retention
+- A maximum receive count of five before redrive
 
-IAM permissions are separated between event producers and consumers.
+The configuration separates producer and consumer IAM roles. Producer services are configured to send messages, while the worker is configured to receive and delete messages and inspect queue attributes.
 
-Producers can send messages while the worker can receive, delete, and inspect queue attributes.
+The repository defines the queue and workload configuration; successful end-to-end event processing requires independent runtime validation.
 
 ---
 
-# Ingress and TLS
+## Ingress, TLS, and DNS
 
-External application traffic enters through an AWS Network Load Balancer.
+The intended external traffic path is:
 
-```text
 Internet
    |
    v
@@ -386,54 +353,19 @@ Kubernetes Ingress
    |
    v
 api-gateway
-```
 
-Traefik is deployed as a Kubernetes LoadBalancer service using:
+Traefik is configured as a Kubernetes LoadBalancer service with an internet-facing AWS Network Load Balancer, IP target mode, a dedicated ingress class, and HTTP-to-HTTPS redirection.
 
-- AWS NLB
-- Internet-facing scheme
-- IP target mode
-- `traefik` ingress class
-- HTTP to HTTPS redirection
+TLS is configured using cert-manager and Let's Encrypt with an ACME DNS-01 challenge. The separate DNS Terraform root manages the Route 53 hosted zone and Cloudflare delegation, while ExternalDNS manages records within its configured domain filter.
+
+The configured hostname remains `jenkins.mud-as-sir.uk`, a historical name from the earlier Jenkins project. Its presence in the configuration does not prove that the current e-commerce application is reachable through public DNS or HTTPS.
 
 ---
 
-# TLS
+## GitOps and Kustomize
 
-TLS certificates are managed by cert-manager and Let's Encrypt.
+Argo CD manages Kubernetes application state using an App-of-Apps architecture.
 
-The platform uses an ACME DNS-01 challenge.
-
-```text
-cert-manager
-     |
-     v
-Let's Encrypt
-     |
-     v
-Route53 DNS challenge
-     |
-     v
-TLS Certificate
-```
-
-The application hostname is:
-
-```text
-jenkins.mud-as-sir.uk
-```
-
-The Kubernetes ingress uses the generated TLS secret and routes traffic to the application gateway.
-
----
-
-# GitOps
-
-ArgoCD manages Kubernetes application state.
-
-The platform uses an **App-of-Apps** architecture.
-
-```text
 platform-root
       |
       +-- e-commerce-dev
@@ -446,618 +378,166 @@ platform-root
       +-- monitoring-stack
       +-- cert-manager
       +-- security
-```
 
-The ArgoCD root application tracks:
+The root Application tracks the `stable-v1.31` revision and the application definitions under:
 
-```text
 terraform/infrastructure/argocd/applications
-```
 
-against:
+The application manifests use a base-and-overlay structure:
 
-```text
-stable-v1.31
-```
-
-## Development
-
-Development uses automated synchronization with:
-
-- prune
-- self-heal
-
-## Production
-
-Production deliberately uses manual synchronization.
-
-This allows production changes to be reviewed before they are applied.
-
-Git remains the source of truth for Kubernetes configuration.
-
----
-
-# Kustomize
-
-The application uses a base/overlay structure.
-
-```text
-application/
+terraform/infrastructure/application/
 ├── base/
-│   ├── services/
-│   ├── kustomization.yaml
-│   └── ...
-│
 └── overlays/
     ├── dev/
     └── prod/
-```
 
-This allows the same application definitions to be reused while applying environment-specific configuration.
+Development is configured for automated synchronization with pruning and self-healing. Production synchronization is manual, allowing production changes to be reviewed before they are applied.
 
-Examples include:
+### Troubleshooting example: Argo CD application state
 
-- replica counts
-- HPA configuration
-- environment-specific settings
+During deployment work, the root Application could report `OutOfSync` while remaining `Healthy`. Production's manual synchronization policy means those states are not interchangeable: a healthy application may intentionally not be fully synchronized.
+
+The deployment script was adjusted to distinguish health from synchronization state instead of treating every `OutOfSync` status as a failed deployment.
+
+This illustrates an important GitOps lesson: validation should account for the configured reconciliation policy rather than assuming every Application must always be `Synced` and `Healthy`.
 
 ---
 
-# Observability
+## Observability
 
-The platform uses the Prometheus and Grafana ecosystem.
-
-The monitoring stack is deployed using:
-
-```text
-kube-prometheus-stack
-```
-
-Components include:
+The monitoring configuration includes:
 
 - Prometheus
 - Grafana
 - Alertmanager
 - ServiceMonitors
-- Prometheus rules
-- Persistent storage
+- PrometheusRules
+- Application dashboards
+- Persistent storage definitions
 
-## Prometheus
+The reviewed configuration specifies a 20 GiB Prometheus PVC with seven-day retention and a 5 GiB Grafana PVC.
 
-Prometheus uses:
-
-```text
-20Gi gp3 PVC
-7 day retention
-```
-
-## Grafana
-
-Grafana uses:
-
-```text
-5Gi gp3 PVC
-```
-
-The monitoring configuration includes ServiceMonitors and dashboards for the application services.
+The repository contains monitoring resources and alert rules. Runtime evidence is needed to establish that targets are being scraped, alerts are evaluated as expected, and notifications are delivered to their intended destination.
 
 ---
 
-# CI/CD
+## CI/CD
 
-GitHub Actions provides the CI/CD pipeline.
+GitHub Actions provides application CI/CD and infrastructure validation workflows. The workflows use GitHub Actions OIDC for AWS authentication rather than requiring long-lived AWS access keys.
 
-The project uses GitHub Actions OIDC to authenticate with AWS.
+### Application pipeline
 
-No long-lived AWS access keys are required by the workflows.
+The application workflow includes:
 
----
+1. Matrix-based processing of the nine services.
+2. Go linting, dependency download, build, and test steps.
+3. Trivy filesystem scanning.
+4. AWS authentication through OIDC.
+5. ECR authentication.
+6. Docker image builds and container image scanning.
+7. Image pushes to ECR using Git commit SHA tags.
+8. Kustomize validation and image-reference updates.
+9. Git commits containing the updated manifest references.
 
-## Application Pipeline
+Commit-SHA tags make images traceable to a source revision instead of relying on a mutable `latest` tag.
 
-The application pipeline performs:
+**Branch alignment matters:** Argo CD tracks `stable-v1.31`. A successful CI run on another branch does not automatically mean that Argo CD will deploy the updated manifests.
 
-1. Matrix-based service processing
-2. Go linting
-3. Dependency download
-4. Build
-5. Unit tests
-6. Trivy filesystem scanning
-7. AWS authentication through OIDC
-8. ECR authentication
-9. Docker image build
-10. Container image scanning
-11. ECR push
-12. Commit-SHA tagging
-13. Kustomize validation
-14. Manifest image update
-15. Git commit and push
+### Infrastructure pipeline
 
-Images are tagged using the Git commit SHA rather than relying on `latest`.
+The Terraform workflow includes formatting and validation, linting and scanning steps, plan generation, approval, and infrastructure application. The deployment workflow uses an approval gate for infrastructure changes and is designed to apply the plan generated during the plan stage.
 
-Example:
-
-```text
-68bf0180...
-```
-
-This makes deployments traceable to an exact source revision.
+The repository also contains Kubernetes manifest and Kustomize validation workflows. Their presence documents the intended CI process; individual workflow results should be checked to confirm actual execution outcomes.
 
 ---
 
-# Infrastructure Pipeline
+## Deployment and destruction
 
-The Terraform pipeline performs:
+The repository includes automation for deployment, Argo CD validation, infrastructure destruction, and LocalStack initialization.
 
-```text
-Terraform fmt
-      |
-      v
-Terraform init
-      |
-      v
-Terraform validate
-      |
-      v
-TFLint
-      |
-      v
-Checkov
-      |
-      v
-Terraform plan
-      |
-      v
-Required approval
-      |
-      v
-Terraform apply
-```
+See [`terraform/scripts/README.md`](terraform/scripts/README.md) for detailed script behaviour and prerequisites.
 
-The deployment workflow uses the `terraform-production` GitHub environment with required reviewer approval.
-
-The pipeline applies the exact Terraform plan artifact that was generated during the plan stage.
-
----
-
-# Kubernetes Validation
-
-The project also includes Kubernetes validation workflows covering:
-
-- Kubernetes manifest validation
-- Kustomize validation
-- Configuration checks
-
-This provides an additional validation layer before Kubernetes configuration reaches the cluster.
-
----
-
-# Security
-
-Security controls implemented throughout the project include:
-
-- GitHub Actions OIDC
-- No static AWS credentials in CI/CD
-- IAM least-privilege policies
-- IRSA
-- KMS encryption
-- EKS secrets encryption
-- AWS Secrets Manager
-- External Secrets
-- Container image scanning
-- Trivy
-- Kubernetes resource limits
-- Liveness/readiness probes
-- Non-root containers
-- Runtime container hardening
-- Network policy support
-- VPC Flow Logs
-- Restricted IAM trust policies
-
-Application containers use a non-root runtime user:
-
-```text
-UID 10001
-```
-
----
-
-# Disaster Recovery and Storage Restore
-
-Persistent workloads were designed with storage recovery in mind.
-
-The project includes:
-
-- EBS VolumeSnapshotClass
-- PostgreSQL snapshot manifests
-- PostgreSQL restore manifests
-- Restore test workflow
-- Retained PostgreSQL storage
-- Documented snapshot/restore procedure
-
-PostgreSQL restore testing was successfully completed as part of the project validation.
-
-The detailed storage and restore procedure is documented in [Storage and PostgreSQL Restore](docs/storage-restore.md).
-
----
-
-# Deployment
-
-The project can be deployed using the Terraform/deployment workflow.
+### Deploy
 
 From the repository root:
 
-```bash
-cd terraform
-terraform init
-terraform validate
-terraform plan
-terraform apply
-```
+bash terraform/scripts/deploy.sh
 
-The repository also contains deployment automation for bringing up the complete platform.
+The deployment script checks prerequisites and Terraform configuration, prepares bootstrap and platform plans with separate approval prompts, configures Kubernetes access, and waits for selected platform resources and application checks.
 
-Before deployment, Terraform plans should always be reviewed before applying infrastructure changes.
+Review the intended AWS account, current state, and generated plans before approving infrastructure changes.
 
----
+### Check Argo CD
 
-# Destruction
+bash terraform/scripts/check-argocd.sh
 
-The environment can be destroyed using the project destruction script:
+This reports discovered Argo CD applications and checks their synchronization and health according to the script's configured rules. It does not prove that every expected Application exists or that all integrations work end to end.
 
-```bash
-./terraform/scripts/destroy.sh
-```
+### Destroy
 
-The destroy workflow includes cleanup and verification for resources that may otherwise remain behind after EKS destruction.
+bash terraform/scripts/destroy.sh
 
-This includes checks for:
+The destruction workflow requires explicit confirmation and performs selected Kubernetes and AWS cleanup before applying the Terraform destroy plan.
 
-- EKS
-- VPC
-- Load Balancers
-- Security Groups
-- NAT infrastructure
-- Elastic IPs
-- SQS queues
-- Kubernetes resources
-- EKS control-plane log groups
+ECR repositories and images are intentionally preserved. The separate DNS Terraform root is not automatically destroyed by the main platform teardown.
 
-ECR repositories are intentionally preserved.
+### Troubleshooting example: Terraform destruction cleanup
+
+An earlier destruction run left the EKS control-plane log group behind after the cluster was removed. The log group was created by EKS rather than being directly managed as a normal resource in the main Terraform root.
+
+The destruction script was updated to discover and clean up relevant EKS log groups and then check their removal.
+
+This led to a broader operational lesson: destroying the main Terraform root does not necessarily remove every AWS resource associated with the platform. The script checks selected resource categories, but its completion message should not be interpreted as proof that every possible billable resource is absent.
+
+### LocalStack
+
+bash terraform/scripts/localstack-init.sh
+
+This helper creates an SQS queue named `orders` in a running LocalStack environment. It belongs to the older local application setup and is separate from the nine-service EKS deployment.
 
 ---
 
-# Challenges and Troubleshooting
+## Validation and project status
 
-One of the main goals of this project was to encounter realistic infrastructure problems and solve them rather than simply following a deployment guide.
+The project has been developed across infrastructure, application, storage, messaging, ingress, GitOps, monitoring, CI/CD, and operational automation.
 
-## External Secrets IRSA Failure
+The repository contains implementation and workflow definitions for these areas. The previous EKS deployment provided live validation at that time, but the current source review did not independently rerun the environment or validate every integration.
 
-### Problem
-
-PostgreSQL and application pods initially entered:
-
-```text
-CreateContainerConfigError
-```
-
-The External Secrets controller could not decrypt the required secret.
-
-### Investigation
-
-A newly created test pod using the External Secrets ServiceAccount was compared with the existing controller pod.
-
-The new pod received:
-
-```text
-AWS_ROLE_ARN
-AWS_WEB_IDENTITY_TOKEN_FILE
-aws-iam-token
-```
-
-This confirmed the IRSA webhook was functioning correctly for newly created pods.
-
-### Root Cause
-
-The existing controller pod had been created before the required IAM mutation was available.
-
-### Resolution
-
-The controller was restarted and the IAM configuration was permanently updated through Terraform.
-
-The IAM policy was given:
-
-```text
-kms:Decrypt
-```
-
-permission against the specific Secrets Manager KMS key.
-
-After the controller restarted:
-
-```text
-ExternalSecret: SecretSynced
-PostgreSQL: Ready
-```
-
----
-
-## ArgoCD Root Application State
-
-The production ArgoCD application intentionally uses manual synchronization.
-
-This meant the root application could report:
-
-```text
-OutOfSync
-Healthy
-```
-
-even though the platform was healthy.
-
-The deployment script was therefore changed to wait for:
-
-```text
-Healthy
-```
-
-rather than requiring:
-
-```text
-Synced + Healthy
-```
-
-This prevents the deployment process from treating intentional production drift as a deployment failure.
-
----
-
-## Terraform Destroy Cleanup
-
-The first complete destruction revealed that the EKS control-plane log group remained after Terraform destroyed the cluster.
-
-The log group:
-
-```text
-/aws/eks/jenkins-eks/cluster
-```
-
-was automatically created by EKS rather than being directly managed by Terraform.
-
-The destruction script was updated to discover and remove the relevant EKS log groups and then verify that they no longer existed.
-
-The final destruction was successfully validated with no remaining:
-
-- EKS cluster
-- VPC
-- Load Balancers
-- NAT resources
-- EKS security groups
-- SQS queues
-- EKS control-plane log groups
-
-ECR was intentionally preserved.
-
----
-
-# Lessons Learned
-
-## Infrastructure as Code Is More Than Creating Resources
-
-Terraform makes infrastructure reproducible, but resource lifecycle still needs to be understood.
-
-AWS-managed or automatically generated resources may not behave exactly like resources directly managed by Terraform.
-
----
-
-## Kubernetes Storage Has Lifecycle Implications
-
-A PVC disappearing does not necessarily mean the underlying AWS storage has disappeared.
-
-Using:
-
-```text
-Retain
-```
-
-means storage must be deliberately managed and recovered or deleted.
-
-This is particularly important for databases.
-
----
-
-## IRSA Depends on Pod Lifecycle
-
-Adding or correcting an IAM role does not necessarily update already-running pods.
-
-When debugging IRSA, checking the actual pod environment and projected token is often more useful than only checking the IAM configuration.
-
----
-
-## GitOps Changes the Deployment Model
-
-With ArgoCD, the deployment pipeline does not need to directly apply Kubernetes manifests.
-
-Instead:
-
-```text
-Git change
-    |
-    v
-ArgoCD
-    |
-    v
-Kubernetes
-```
-
-This provides a clear separation between infrastructure provisioning and application reconciliation.
-
----
-
-## Production Should Not Be Treated Like Development
-
-Development can use:
-
-```text
-automated sync
-prune
-self-heal
-```
-
-Production deliberately uses manual synchronization.
-
-This creates a review point before production changes are applied.
-
----
-
-## Image Tags Should Be Immutable
-
-Using:
-
-```text
-:latest
-```
-
-makes it difficult to determine exactly what version is running.
-
-Using the Git commit SHA provides a direct relationship between:
-
-```text
-Git commit
-     |
-     v
-Docker image
-     |
-     v
-Kubernetes deployment
-```
-
----
-
-# Repository Structure
-
-The repository is organised around infrastructure, Kubernetes configuration, CI/CD, and deployment automation.
-
-```text
-.
-├── .github/
-│   └── workflows/
-│       ├── application-ci.yml
-│       ├── kubernetes-validation.yaml
-│       ├── terraform-deploy.yml
-│       └── validate.yaml
-│
-├── bootstrap/
-│   └── Terraform configuration for persistent GitHub OIDC access
-│
-├── terraform/
-│   ├── main.tf
-│   ├── variables.tf
-│   ├── outputs.tf
-│   ├── providers.tf
-│   ├── backend.tf
-│   ├── helm.tf
-│   │
-│   ├── modules/
-│   │   ├── eks/
-│   │   ├── iam/
-│   │   ├── vpc/
-│   │   ├── ecr/
-│   │   ├── sqs/
-│   │   ├── secrets/
-│   │   ├── argocd/
-│   │   └── ...
-│   │
-│   ├── infrastructure/
-│   │   ├── application/
-│   │   │   ├── base/
-│   │   │   └── overlays/
-│   │   │       ├── dev/
-│   │   │       └── prod/
-│   │   │
-│   │   ├── argocd/
-│   │   │   └── applications/
-│   │   │
-│   │   └── monitoring/
-│   │
-│   └── scripts/
-│       ├── deploy.sh
-│       └── destroy.sh
-│
-├── services/
-│   ├── api-gateway/
-│   ├── order-service/
-│   ├── inventory-service/
-│   ├── payment-service/
-│   ├── notification-service/
-│   ├── shipping-service/
-│   ├── worker/
-│   ├── scheduler/
-│   └── dashboard-api/
-│
-└── README.md
-```
-
----
-
-# Core 100 Validation
-
-The project was audited against the Core 100 requirements.
-
-| Phase | Requirement | Status |
+| Area | Evidence in the repository | What establishes runtime behaviour |
 |---|---|---|
-| 1 | Infrastructure | PASS |
-| 2 | Storage | PASS |
-| 3 | Stateful Tier | PASS |
-| 4 | Application | PASS |
-| 5 | Event Bus | PASS |
-| 6 | Ingress | PASS |
-| 7 | GitOps | PASS |
-| 8 | Observability | PASS |
-| 9 | CI/CD | PASS |
-| 10 | Documentation | In progress |
+| Infrastructure | Terraform modules and root configuration | Plan/apply results and AWS resource inspection |
+| Application services | Go source, Dockerfiles, Kubernetes manifests | Build/test results and integration checks |
+| Messaging | SQS resources and workload configuration | Successful message send/receive and DLQ behaviour |
+| GitOps | Argo CD Applications and Kustomize overlays | Current sync, health, and resource ownership |
+| Ingress and DNS | Traefik, cert-manager, ExternalDNS, DNS Terraform | NLB, delegation, certificate, DNS, and HTTPS checks |
+| Storage | Persistent volumes and snapshot/restore resources | Current volume/snapshot state and restore-integrity evidence |
+| Observability | Prometheus, Grafana, ServiceMonitors, alert rules | Scraping, alert evaluation, dashboards, and notification delivery |
+| CI/CD | GitHub Actions workflows | Successful workflow runs and deployed image revisions |
+| Destruction | Cleanup and verification scripts | AWS inventory of remaining resources |
 
-The first nine phases were implemented and validated through Terraform checks, repository inspection, CI/CD validation, Kubernetes deployment testing, and live EKS validation.
+### Validation approach
 
----
+The project's validation workflow has included the following categories:
 
-# Validation Approach
-
-The project was not considered complete simply because Terraform could create resources.
-
-Validation included:
-
-- Terraform validation
-- Terraform plan review
-- TFLint
-- Checkov
-- Shell validation
+- Terraform formatting, validation, and plan review
+- TFLint and Checkov
+- Shell script validation
 - Kustomize validation
 - Docker builds
 - Trivy scanning
 - GitHub Actions validation
-- Live EKS deployment
-- Kubernetes readiness checks
-- ArgoCD health checks
-- PostgreSQL readiness
-- Redis readiness
+- EKS deployment and Kubernetes readiness checks
+- Argo CD application health checks
+- PostgreSQL and Redis readiness
 - Persistent volume validation
 - Monitoring validation
-- Snapshot/restore testing
-- Destroy and cleanup verification
+- Snapshot/restore workflow checks
+- Destruction and cleanup verification
 
-The platform was successfully deployed to EKS and subsequently destroyed after validation to avoid leaving unnecessary AWS resources running.
+These are the validation activities documented for the project. Their inclusion in this list does not imply that every check has been rerun against the current working tree or a live cluster.
 
----
+The project lifecycle is designed around:
 
-# Project Status
-
-The implementation has completed the Core 100 requirements through the first nine phases.
-
-The final documentation phase is being completed through this README.
-
-The project demonstrates the full lifecycle:
-
-```text
 Design
   |
   v
@@ -1067,68 +547,126 @@ Terraform
 AWS Infrastructure
   |
   v
-EKS
-  |
-  v
-Kubernetes Platform
+EKS Platform
   |
   v
 Application Deployment
   |
   v
-GitOps
+GitOps and CI/CD
   |
   v
-Observability
-  |
-  v
-CI/CD
-  |
-  v
-Validation
+Monitoring and Validation
   |
   v
 Troubleshooting
   |
   v
-Destruction
-```
-
-The environment can therefore be created, validated, and destroyed through Infrastructure as Code rather than depending on manually configured infrastructure.
+Infrastructure Destruction
 
 ---
 
-# Author
+## Lessons learned
+
+### Infrastructure as Code is more than creating resources
+
+Terraform makes infrastructure reproducible, but resource ownership and lifecycle still matter. AWS-managed resources and controller-created resources may have cleanup behaviour that differs from directly managed Terraform resources.
+
+### Kubernetes storage has lifecycle implications
+
+Deleting a PVC does not necessarily mean the underlying EBS volume has disappeared. Reclaim policies, snapshots, retained volumes, and restoration procedures need to be understood when working with persistent databases.
+
+### Workload identity and pod lifecycle matter
+
+When investigating an AWS integration, inspect the actual workload and its identity configuration as well as the Terraform IAM resources. Existing pods may not immediately reflect every configuration change.
+
+### GitOps changes the deployment model
+
+Argo CD separates infrastructure provisioning from Kubernetes resource reconciliation. Git revisions, synchronization policies, and resource ownership all affect what gets deployed.
+
+### Development and production need different workflows
+
+Development can use automated synchronization, pruning, and self-healing. Production can use manual synchronization to create a review point before changes are applied.
+
+### Immutable image references improve traceability
+
+Using a Git commit SHA for an image establishes a clearer relationship between source code, container image, and Kubernetes manifest than relying on `latest`.
+
+### Configuration is not the same as validation
+
+A manifest documents intended behaviour. A successful runtime check establishes that behaviour under the conditions tested. This distinction matters for application integration, monitoring, storage recovery, DNS, and cleanup.
+
+---
+
+## Repository structure
+
+The repository is organized around infrastructure, Kubernetes configuration, application source, CI/CD, and operational automation.
+
+.
+├── .github/
+│   └── workflows/
+├── bootstrap/
+├── docs/
+├── screenshots/
+├── services/
+│   ├── api-gateway/
+│   ├── dashboard-api/
+│   ├── inventory-service/
+│   ├── notification-service/
+│   ├── order-service/
+│   ├── payment-service/
+│   ├── scheduler/
+│   ├── shipping-service/
+│   └── worker/
+├── terraform/
+│   ├── dns/
+│   ├── infrastructure/
+│   │   ├── application/
+│   │   ├── argocd/
+│   │   ├── monitoring/
+│   │   ├── postgres/
+│   │   ├── redis/
+│   │   ├── secrets/
+│   │   ├── snapshot/
+│   │   └── storage/
+│   ├── modules/
+│   ├── scripts/
+│   ├── main.tf
+│   ├── helm.tf
+│   ├── variables.tf
+│   └── backend.tf
+├── README.md
+└── READMELEGACY.md
+
+This is a high-level view; individual directories contain additional configuration and supporting files. The legacy README retains historical Jenkins-era documentation.
+
+## CI/CD and Validation Evidence
+
+The project uses GitHub Actions to validate application code, Kubernetes manifests, and infrastructure configuration. The following successful workflow runs were recorded on the `stable-v1.31` branch on 20 October 2026.
+
+| Workflow | Evidence |
+|---|---|
+| Application CI | [View successful run](https://github.com/TheMudda6/jenkins-eks-challenge/actions/runs/39413130445) |
+| Kubernetes Manifest Validation | [View successful run](https://github.com/TheMudda6/jenkins-eks-challenge/actions/runs/39413130406) |
+| Validate Infrastructure | [View successful run](https://github.com/TheMudda6/jenkins-eks-challenge/actions/runs/39413130370) |
+
+These runs provide evidence of the corresponding workflows completing successfully at the recorded commit. They do not, by themselves, establish that the current infrastructure is deployed or that every application integration has been validated.
+
+Architecture diagrams and refreshed deployment screenshots will be added after the visual evidence has been updated and verified.
+
+
+- [`terraform/README.md`](terraform/README.md) — infrastructure architecture, Terraform modules, state boundaries, and deployment workflow.
+- [`terraform/scripts/README.md`](terraform/scripts/README.md) — deployment, Argo CD validation, destruction, and LocalStack scripts.
+- [`docs/secrets-rotation.md`](docs/secrets-rotation.md) — secret synchronization and rotation procedure.
+- [`docs/storage-restore.md`](docs/storage-restore.md) — persistent storage and restoration procedure.
+- [`READMELEGACY.md`](READMELEGACY.md) — historical Jenkins-era documentation.
+
+## Author
 
 **Mudassir Shaikh**
 
 DevOps / Cloud Engineering Portfolio Project
 
-Technologies demonstrated:
+### Skills demonstrated
 
-```text
-AWS
-Amazon EKS
-Terraform
-Kubernetes
-Docker
-Kustomize
-ArgoCD
-GitHub Actions
-Karpenter
-Traefik
-cert-manager
-Let's Encrypt
-Prometheus
-Grafana
-PostgreSQL
-Redis
-Amazon SQS
-AWS Secrets Manager
-External Secrets
-Amazon ECR
-IAM
-IRSA
-KMS
-Route53
-```
+AWS · Amazon EKS · Terraform · Kubernetes · Go · Docker · Kustomize · Argo CD · GitHub Actions · Karpenter · Traefik · cert-manager · Let's Encrypt · Prometheus · Grafana · PostgreSQL · Redis · Amazon SQS · AWS Secrets Manager · External Secrets · Amazon ECR · IAM · IRSA · KMS · Route 53 · Cloudflare · Infrastructure automation · GitOps

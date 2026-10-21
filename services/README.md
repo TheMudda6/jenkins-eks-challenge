@@ -6,9 +6,7 @@ This document summarises the code-quality and reliability fixes made to the nine
 
 The goal was to preserve the original application behaviour while making the services pass the project's CI linting standard:
 
-```bash
 go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.4.0 run
-```
 
 All nine services now pass with **0 issues**.
 
@@ -74,9 +72,7 @@ This keeps the original service functionality intact while making failures obser
 
 Each service was run individually with the exact linter version used by the CI workflow:
 
-```bash
 go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.4.0 run
-```
 
 Final result:
 
