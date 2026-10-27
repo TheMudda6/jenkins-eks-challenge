@@ -1,5 +1,11 @@
 # Kubernetes E-Commerce Platform on Amazon EKS
 
+## Application Preview
+
+The e-commerce dashboard was accessed through the custom domain during a live deployment.
+
+![E-commerce dashboard accessed through the custom domain](screenshots/application-custom-domain.png)
+
 A production-inspired, cloud-native e-commerce platform built on **Amazon EKS**, using Terraform, Kubernetes, Go, Docker, Kustomize, Argo CD, GitHub Actions, AWS managed services, and an observability stack.
 
 This project evolved from an earlier Jenkins-on-EKS deployment into a nine-service Kubernetes platform based on **The K8s Project (v2 Edition) – E-Commerce Platform**.
@@ -10,123 +16,99 @@ The platform was previously deployed to EKS for live validation and subsequently
 
 ---
 
-## Project overview
+## Project Overview
 
-The project brings together infrastructure provisioning, application delivery, persistent data, asynchronous messaging, GitOps, and monitoring.
+This project deploys a nine-service e-commerce platform to Amazon EKS using Terraform, Kubernetes, and GitOps.
 
-- Infrastructure as Code with Terraform
-- Amazon EKS 1.33 and Kubernetes
-- VPC networking with public and private subnets
-- Karpenter components for node provisioning
-- Amazon ECR container repositories
-- PostgreSQL and Redis
-- Amazon EBS CSI storage and snapshot/restore resources
-- AWS Secrets Manager and External Secrets
-- Amazon SQS with a dead-letter queue
-- Traefik ingress behind an AWS Network Load Balancer
-- TLS configuration with cert-manager and Let's Encrypt
-- Route 53 DNS and Cloudflare delegation
-- Argo CD App-of-Apps GitOps
-- Kustomize development and production overlays
-- Prometheus and Grafana monitoring configuration
-- GitHub Actions CI/CD and OIDC authentication
-- Container image scanning and immutable image tags
-- Horizontal Pod Autoscaling
-- Deployment, validation, and destruction automation
+**Key components**
+
+- **Infrastructure:** AWS VPC, EKS, IAM, KMS, ECR, and Karpenter components provisioned with Terraform.
+- **Application:** Nine Go microservices packaged as Docker images and deployed with Kubernetes.
+- **Data and messaging:** PostgreSQL, Redis, Amazon SQS, and a dead-letter queue.
+- **Networking:** Traefik ingress, TLS, and custom-domain routing.
+- **Delivery:** GitHub Actions for CI and Argo CD with Kustomize for GitOps.
+- **Observability:** Prometheus and Grafana monitoring.
+
+The infrastructure was deployed and validated, including access to the application through its custom domain. The environment is being torn down after validation to avoid ongoing AWS costs.
 
 ## Architecture
 
-### Application traffic and data flow
+The platform runs nine Go microservices on Amazon EKS, with PostgreSQL and Redis providing data storage and Amazon SQS handling asynchronous work. Terraform manages the AWS infrastructure, while Argo CD and Kustomize manage Kubernetes application delivery.
 
-                         Internet
-                            |
-                            v
-                    AWS Network Load Balancer
-                            |
-                            v
-                       Traefik Ingress
-                            |
-                            v
-                     api-gateway :8080
-                            |
-          +-----------------+------------------+
-          |                 |                  |
-          v                 v                  v
-   order-service     inventory-service    payment-service
-       :8081              :8082               :8083
+### AWS Infrastructure
 
-   Additional application services:
-   notification-service :8084
-   shipping-service     :8085
-   dashboard-api       :8086
-   worker              :8090
-   scheduler           :8091
+![AWS infrastructure architecture](screenshots/aws-infrastructure.png)
 
-          +-------------------------+
-          |                         |
-          v                         v
-      PostgreSQL                  Redis
-          |
-          v
-      AWS EBS storage
+### Application Architecture
 
- order-service / payment-service / shipping-service
-                            |
-                            v
-                       Amazon SQS
-                            |
-                            v
-                          Worker
-                            |
-                            v
-                    Dead-letter queue
+![E-commerce application architecture](screenshots/application-architecture.png)
 
-This is a conceptual overview of the architecture and intended integrations, not a verified trace of every application request or event.
+### CI/CD and GitOps
 
-### Infrastructure and delivery
+![CI/CD and GitOps workflow](screenshots/cicd-gitops.png)
 
-Terraform
-    |
-    +---- VPC and AWS infrastructure
-    |
-    +---- EKS and selected platform Helm releases
-    |
-    +---- ECR, SQS, IAM, KMS and Secrets Manager
-    |
-    v
-  Amazon EKS <---------------- GitHub Actions
-    |                              |
-    |                              v
-    |                         Build and publish
-    |                         service images
-    |
-    v
-  Argo CD <---------------- Git repository
-    |
-    +---- Application overlays
-    +---- PostgreSQL and Redis
-    +---- Storage and secrets configuration
-    +---- Monitoring and platform resources
+For a more detailed explanation of the architecture and its components, see [the architecture documentation](docs/architecture.md).
 
-Terraform provisions cloud infrastructure and selected platform components. Argo CD reconciles Kubernetes resources from Git, while Kubernetes controllers manage resources within their respective responsibilities. Some supporting resources are handled by dedicated scripts and controllers.
+### Infrastructure and Delivery
+
+Terraform provisions the AWS infrastructure and supporting platform components. GitHub Actions validates changes and builds application images, while Argo CD reconciles Kubernetes resources from Git.
+
+The delivery workflow follows this path:
+
+```text
+Developer changes
+       |
+       v
+GitHub repository
+       |
+       v
+GitHub Actions
+(validate, test, build, scan)
+       |
+       v
+Amazon ECR
+(store application images)
+       |
+       v
+Kubernetes manifests
+(Kustomize overlays)
+       |
+       v
+Argo CD
+       |
+       v
+Amazon EKS
+(run application services)
+```
+
+Terraform manages the underlying AWS infrastructure, while Argo CD manages application resources declared in Git.
 
 ---
 
-## Application services
+## Project Lifecycle
 
-The application consists of nine independently containerized Go services.
+1. Infrastructure design and Terraform provisioning
+2. EKS platform and supporting services setup
+3. Application deployment and configuration
+4. CI/CD pipeline and GitOps validation
+5. Monitoring, troubleshooting, and verification
+6. Infrastructure teardown to control AWS costs
 
-| Service | Port | Purpose |
-|---|---:|---|
-| `api-gateway` | 8080 | Entry point for application requests and backend routing |
-| `order-service` | 8081 | Order operations and order-event publishing |
-| `inventory-service` | 8082 | Product and inventory reservation operations |
-| `payment-service` | 8083 | Payment operations and event publishing |
-| `notification-service` | 8084 | Notification templates and history |
-| `shipping-service` | 8085 | Shipment operations and carrier webhook |
-| `worker` | 8090 | SQS message consumption |
-| `scheduler` | 8091 | Scheduled background jobs |
-| `dashboard-api` | 8086 | Dashboard data and static dashboard content |
+## Application Services
+
+The platform consists of nine Go microservices, each deployed independently on Kubernetes.
+
+| Service | Role | Port |
+|---|---|---:|
+| `api-gateway` | Entry point for application requests | 8080 |
+| `order-service` | Order processing | 8081 |
+| `inventory-service` | Inventory management | 8082 |
+| `payment-service` | Payment processing | 8083 |
+| `notification-service` | Notifications | 8084 |
+| `shipping-service` | Shipping operations | 8085 |
+| `dashboard-api` | Dashboard data API | 8086 |
+| `worker` | Asynchronous message processing | 8090 |
+| `scheduler` | Scheduled tasks | 8091 |
 
 The service configuration includes Kubernetes Deployments and Services, resource requests and limits, readiness and liveness probes, dedicated ServiceAccounts, and multi-stage Docker builds. Horizontal Pod Autoscaling is configured for HTTP-facing services.
 
@@ -134,28 +116,19 @@ The reviewed Kubernetes configuration uses fixed two-replica Deployments for the
 
 ---
 
-## Technology stack
+## Technology Stack
 
-| Category | Technologies |
+| Area | Technologies |
 |---|---|
-| Cloud | AWS |
+| Cloud | AWS, Amazon EKS |
 | Infrastructure as Code | Terraform |
-| Container orchestration | Amazon EKS, Kubernetes |
-| Application | Go, Docker |
-| Networking | Amazon VPC, routing, NAT Gateway |
-| Container registry | Amazon ECR |
-| Identity | AWS IAM, IRSA, GitHub Actions OIDC |
-| Encryption | AWS KMS |
-| Messaging | Amazon SQS and dead-letter queue |
-| Data | PostgreSQL, Redis |
-| Storage | Amazon EBS, EBS CSI, gp3 StorageClasses |
-| Ingress | Traefik, AWS Load Balancer Controller, NLB |
-| TLS and DNS | cert-manager, Let's Encrypt, Route 53, Cloudflare |
+| Containers | Docker, Kubernetes |
+| Application | Go |
+| Networking and TLS | Traefik, AWS Network Load Balancer, cert-manager |
+| Data and messaging | PostgreSQL, Redis, Amazon SQS |
 | GitOps | Argo CD, Kustomize |
+| CI/CD | GitHub Actions, Amazon ECR, Trivy |
 | Observability | Prometheus, Grafana |
-| CI/CD | GitHub Actions |
-| Automation | Bash, Terraform |
-| Version control | Git, GitHub |
 
 ---
 
@@ -254,6 +227,7 @@ Redis runs as a single replica with persistent storage. The configuration includ
 
 The platform defines two StorageClasses:
 
+```text
 gp3
   ReclaimPolicy: Delete
   Intended for ordinary persistent workloads
@@ -261,6 +235,7 @@ gp3
 gp3-retain
   ReclaimPolicy: Retain
   Used for PostgreSQL storage
+```
 
 Retained EBS volumes can survive Kubernetes or EKS destruction. They must be deliberately accounted for during cleanup.
 
@@ -274,6 +249,7 @@ The manifests and documentation describe the intended recovery workflow. They do
 
 The intended application secret flow is:
 
+```text
 AWS Secrets Manager
         |
         v
@@ -284,6 +260,7 @@ Kubernetes Secret
         |
         v
 Application
+```
 
 The platform uses IAM, IRSA, AWS Secrets Manager, and KMS permissions to integrate secrets with Kubernetes workloads.
 
@@ -295,9 +272,11 @@ During deployment validation, PostgreSQL and application pods encountered `Creat
 
 The investigation compared the existing controller pod with a newly created test pod using the same ServiceAccount. The test pod received the expected web identity environment and projected token configuration:
 
+```text
 AWS_ROLE_ARN
 AWS_WEB_IDENTITY_TOKEN_FILE
 aws-iam-token
+```
 
 This helped isolate the problem to the lifecycle of the existing controller pod and the timing of the IAM configuration change.
 
@@ -311,16 +290,18 @@ This is a documented troubleshooting outcome from the earlier deployment, not a 
 
 Amazon SQS provides the platform's asynchronous messaging resources.
 
+```text
 Producers
-   |
-   v
-orders queue
-   |
-   v
-worker
-   |
-   v
-orders dead-letter queue
+    |
+    v
+Orders queue
+    |
+    v
+Worker
+    |
+    v
+Orders dead-letter queue
+```
 
 The reviewed queue configuration includes:
 
@@ -340,19 +321,21 @@ The repository defines the queue and workload configuration; successful end-to-e
 
 The intended external traffic path is:
 
+```text
 Internet
-   |
-   v
+    |
+    v
 AWS Network Load Balancer
-   |
-   v
+    |
+    v
 Traefik
-   |
-   v
+    |
+    v
 Kubernetes Ingress
-   |
-   v
+    |
+    v
 api-gateway
+```
 
 Traefik is configured as a Kubernetes LoadBalancer service with an internet-facing AWS Network Load Balancer, IP target mode, a dedicated ingress class, and HTTP-to-HTTPS redirection.
 
@@ -364,42 +347,41 @@ The configured hostname remains `jenkins.mud-as-sir.uk`, a historical name from 
 
 ## GitOps and Kustomize
 
-Argo CD manages Kubernetes application state using an App-of-Apps architecture.
+Argo CD manages Kubernetes resources through an App-of-Apps architecture.
 
+```text
 platform-root
-      |
-      +-- e-commerce-dev
-      +-- e-commerce-prod
-      +-- postgres
-      +-- redis
-      +-- secrets
-      +-- storage
-      +-- monitoring
-      +-- monitoring-stack
-      +-- cert-manager
-      +-- security
+├── e-commerce-dev
+├── e-commerce-prod
+├── postgres
+├── redis
+├── secrets
+├── storage
+├── monitoring
+├── monitoring-stack
+├── cert-manager
+└── security
+```
 
-The root Application tracks the `stable-v1.31` revision and the application definitions under:
+The root Application tracks the `stable-v1.31` branch and the definitions in `terraform/infrastructure/argocd/applications/`.
 
-terraform/infrastructure/argocd/applications
+Application manifests use a base-and-overlay structure:
 
-The application manifests use a base-and-overlay structure:
-
+```text
 terraform/infrastructure/application/
 ├── base/
 └── overlays/
     ├── dev/
     └── prod/
+```
 
-Development is configured for automated synchronization with pruning and self-healing. Production synchronization is manual, allowing production changes to be reviewed before they are applied.
+Development uses automated synchronization, pruning, and self-healing. Production synchronization is manual so changes can be reviewed before they are applied.
 
-### Troubleshooting example: Argo CD application state
+### Troubleshooting Example: Argo CD Sync Status
 
-During deployment work, the root Application could report `OutOfSync` while remaining `Healthy`. Production's manual synchronization policy means those states are not interchangeable: a healthy application may intentionally not be fully synchronized.
+During deployment, the root Application reported `OutOfSync` while remaining `Healthy`. Because production synchronization is manual, these statuses do not necessarily indicate a failure.
 
-The deployment script was adjusted to distinguish health from synchronization state instead of treating every `OutOfSync` status as a failed deployment.
-
-This illustrates an important GitOps lesson: validation should account for the configured reconciliation policy rather than assuming every Application must always be `Synced` and `Healthy`.
+The deployment checks were adjusted to distinguish application health from synchronization state, avoiding false deployment failures when manual synchronization is expected.
 
 ---
 
@@ -461,7 +443,9 @@ See [`terraform/scripts/README.md`](terraform/scripts/README.md) for detailed sc
 
 From the repository root:
 
+```bash
 bash terraform/scripts/deploy.sh
+```
 
 The deployment script checks prerequisites and Terraform configuration, prepares bootstrap and platform plans with separate approval prompts, configures Kubernetes access, and waits for selected platform resources and application checks.
 
@@ -469,13 +453,17 @@ Review the intended AWS account, current state, and generated plans before appro
 
 ### Check Argo CD
 
+```bash
 bash terraform/scripts/check-argocd.sh
+```
 
 This reports discovered Argo CD applications and checks their synchronization and health according to the script's configured rules. It does not prove that every expected Application exists or that all integrations work end to end.
 
 ### Destroy
 
+```bash
 bash terraform/scripts/destroy.sh
+```
 
 The destruction workflow requires explicit confirmation and performs selected Kubernetes and AWS cleanup before applying the Terraform destroy plan.
 
@@ -491,80 +479,32 @@ This led to a broader operational lesson: destroying the main Terraform root doe
 
 ### LocalStack
 
+```bash
 bash terraform/scripts/localstack-init.sh
+```
 
 This helper creates an SQS queue named `orders` in a running LocalStack environment. It belongs to the older local application setup and is separate from the nine-service EKS deployment.
 
 ---
 
-## Validation and project status
+## Validation and Project Status
 
-The project has been developed across infrastructure, application, storage, messaging, ingress, GitOps, monitoring, CI/CD, and operational automation.
+The project has been deployed to EKS and validated during a previous live deployment. The environment is being destroyed to avoid ongoing AWS costs.
 
-The repository contains implementation and workflow definitions for these areas. The previous EKS deployment provided live validation at that time, but the current source review did not independently rerun the environment or validate every integration.
+Validation covered the following areas:
 
-| Area | Evidence in the repository | What establishes runtime behaviour |
-|---|---|---|
-| Infrastructure | Terraform modules and root configuration | Plan/apply results and AWS resource inspection |
-| Application services | Go source, Dockerfiles, Kubernetes manifests | Build/test results and integration checks |
-| Messaging | SQS resources and workload configuration | Successful message send/receive and DLQ behaviour |
-| GitOps | Argo CD Applications and Kustomize overlays | Current sync, health, and resource ownership |
-| Ingress and DNS | Traefik, cert-manager, ExternalDNS, DNS Terraform | NLB, delegation, certificate, DNS, and HTTPS checks |
-| Storage | Persistent volumes and snapshot/restore resources | Current volume/snapshot state and restore-integrity evidence |
-| Observability | Prometheus, Grafana, ServiceMonitors, alert rules | Scraping, alert evaluation, dashboards, and notification delivery |
-| CI/CD | GitHub Actions workflows | Successful workflow runs and deployed image revisions |
-| Destruction | Cleanup and verification scripts | AWS inventory of remaining resources |
+| Area | Validation evidence |
+|---|---|
+| Infrastructure | Terraform formatting, validation, and plan review |
+| Application | Go builds, tests, Docker builds, and Kubernetes readiness checks |
+| CI/CD | GitHub Actions workflow results and image publishing |
+| GitOps | Argo CD application health and synchronization checks |
+| Data and messaging | PostgreSQL, Redis, and SQS configuration and readiness |
+| Networking | Ingress, TLS, DNS, and HTTPS checks |
+| Observability | Monitoring resources and configuration |
+| Operations | Storage recovery procedures and infrastructure cleanup |
 
-### Validation approach
-
-The project's validation workflow has included the following categories:
-
-- Terraform formatting, validation, and plan review
-- TFLint and Checkov
-- Shell script validation
-- Kustomize validation
-- Docker builds
-- Trivy scanning
-- GitHub Actions validation
-- EKS deployment and Kubernetes readiness checks
-- Argo CD application health checks
-- PostgreSQL and Redis readiness
-- Persistent volume validation
-- Monitoring validation
-- Snapshot/restore workflow checks
-- Destruction and cleanup verification
-
-These are the validation activities documented for the project. Their inclusion in this list does not imply that every check has been rerun against the current working tree or a live cluster.
-
-The project lifecycle is designed around:
-
-Design
-  |
-  v
-Terraform
-  |
-  v
-AWS Infrastructure
-  |
-  v
-EKS Platform
-  |
-  v
-Application Deployment
-  |
-  v
-GitOps and CI/CD
-  |
-  v
-Monitoring and Validation
-  |
-  v
-Troubleshooting
-  |
-  v
-Infrastructure Destruction
-
----
+These checks describe the validation performed during project development. They do not imply that the environment is currently running or that every integration has been retested against the current working tree.
 
 ## Lessons learned
 
@@ -598,47 +538,29 @@ A manifest documents intended behaviour. A successful runtime check establishes 
 
 ---
 
-## Repository structure
+## Repository Structure
 
-The repository is organized around infrastructure, Kubernetes configuration, application source, CI/CD, and operational automation.
-
+```text
 .
-├── .github/
-│   └── workflows/
-├── bootstrap/
-├── docs/
-├── screenshots/
-├── services/
-│   ├── api-gateway/
-│   ├── dashboard-api/
-│   ├── inventory-service/
-│   ├── notification-service/
-│   ├── order-service/
-│   ├── payment-service/
-│   ├── scheduler/
-│   ├── shipping-service/
-│   └── worker/
-├── terraform/
-│   ├── dns/
-│   ├── infrastructure/
-│   │   ├── application/
-│   │   ├── argocd/
-│   │   ├── monitoring/
-│   │   ├── postgres/
-│   │   ├── redis/
-│   │   ├── secrets/
-│   │   ├── snapshot/
-│   │   └── storage/
-│   ├── modules/
-│   ├── scripts/
-│   ├── main.tf
-│   ├── helm.tf
-│   ├── variables.tf
-│   └── backend.tf
+├── .github/workflows/   # CI/CD workflows
+├── docs/                # Project documentation
+├── screenshots/         # Application and architecture evidence
+├── services/            # Nine Go microservices
+├── terraform/           # AWS infrastructure and Kubernetes configuration
+├── dns/                 # DNS configuration
 ├── README.md
-└── READMELEGACY.md
+└── READMELEGACY.md      # Historical project documentation
+```
 
-This is a high-level view; individual directories contain additional configuration and supporting files. The legacy README retains historical Jenkins-era documentation.
+The main directories separate application code, infrastructure, delivery automation, and project evidence.
+
+## Further Documentation
+
+- [Terraform documentation](terraform/README.md)
+- [Deployment and utility scripts](terraform/scripts/README.md)
+- [Secrets rotation guide](docs/secrets-rotation.md)
+- [Storage and restore guide](docs/storage-restore.md)
+- [Legacy README](READMELEGACY.md)
 
 ## CI/CD and Validation Evidence
 
