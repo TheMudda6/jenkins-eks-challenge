@@ -6,18 +6,20 @@ The workflows provide automated quality checks and deployment automation for the
 
 ## Directory structure
 
+```text
 .github/
 └── workflows/
     ├── application-ci.yml
     ├── kubernetes-validation.yaml
     ├── terraform-deploy.yml
     └── validate.yaml
+```
 
 ## Workflows
 
 ### 1. Application CI
 
-**File:** `workflows/application-ci.yml`
+**File:** `.github/workflows/application-ci.yml`
 
 Builds and validates the nine Go microservices:
 
@@ -35,6 +37,7 @@ The workflow uses matrix jobs to lint and test each service independently. It th
 
 Published images use the Git commit SHA as their tag. The workflow subsequently updates the Kubernetes Deployment manifests and validates the Kustomize base and development and production overlays.
 
+```mermaid
 flowchart TD
     A[Push or Pull Request] --> B[Lint Services]
     B --> C[Test and Build Services]
@@ -42,18 +45,19 @@ flowchart TD
     D --> E[Build Docker Images]
     E --> F[Trivy Image Scan]
     F --> G{Push Event?}
-    G -- Yes --> H[Authenticate to AWS]
+    G -->|Yes| H[Authenticate to AWS]
     H --> I[Push Images to ECR]
     I --> J[Update Kubernetes Image Tags]
     J --> K[Validate Kustomize]
     K --> L[Commit Manifest Updates]
-    G -- No --> M[CI Checks Only]
+    G -->|No| M[CI Checks Only]
+```
 
 AWS authentication uses GitHub Actions OIDC and the configured `AWS_ROLE_ARN` secret. The workflow also uses the repository's `AWS_REGION` variable.
 
 ### 2. Kubernetes Manifest Validation
 
-**File:** `workflows/kubernetes-validation.yaml`
+**File:** `.github/workflows/kubernetes-validation.yaml`
 
 Validates Kubernetes configuration by:
 
@@ -66,7 +70,7 @@ This workflow helps catch manifest and schema errors before configuration change
 
 ### 3. Terraform Deployment
 
-**File:** `workflows/terraform-deploy.yml`
+**File:** `.github/workflows/terraform-deploy.yml`
 
 Automates Terraform deployment for the AWS platform. The workflow is triggered by changes under `terraform/` or changes to its own workflow on the `stable-v1.31` branch. It can also be started manually.
 
@@ -79,11 +83,11 @@ The pipeline separates infrastructure provisioning into stages:
 
 AWS authentication uses GitHub Actions OIDC. Terraform inputs are supplied through repository variables and secrets.
 
-**Operational warning:** this workflow can create or modify AWS resources and may incur charges. Review its plan, environment protection rules, variables, and secrets before running it.
+**Operational warning:** This workflow can create or modify AWS resources and may incur charges. Review its plan, environment protection rules, variables, and secrets before running it.
 
 ### 4. Infrastructure Validation
 
-**File:** `workflows/validate.yaml`
+**File:** `.github/workflows/validate.yaml`
 
 Runs infrastructure quality and security checks:
 
@@ -99,6 +103,7 @@ This workflow is designed to detect configuration, security, and shell-script is
 
 The workflows have distinct responsibilities:
 
+```mermaid
 flowchart LR
     A[Repository Change] --> B[Infrastructure Validation]
     A --> C[Kubernetes Validation]
@@ -109,6 +114,7 @@ flowchart LR
     C --> G[Kustomize and Schema Checks]
     D --> H[Service Tests and Container Images]
     E --> I[AWS Infrastructure Changes]
+```
 
 The exact triggers and job dependencies are defined in each workflow file. A workflow appearing in this diagram does not imply that another workflow automatically waits for it unless that dependency is explicitly configured.
 
